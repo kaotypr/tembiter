@@ -31,6 +31,28 @@ npx --package . tembiter init \
 
 `tembiter init` copies that tag's file tree into `--target` (it does not clone the template as the project repository), writes `.tembiter/config.json` with the template identity and tag, runs `git init`, and creates one commit.
 
+### Connect an existing project
+
+Use `adopt` when the project already exists and the template already has version tags. It writes `.tembiter/config.json` and creates one new commit of `.tembiter/` only. It does not copy template files and does not rewrite project history.
+
+```sh
+npx --package . tembiter adopt \
+  --template /path/to/template \
+  --tag v1.0.0 \
+  --project /path/to/existing-project
+```
+
+| Flag | Required | Meaning |
+| --- | --- | --- |
+| `--template` | yes | Local git repository path or git URL (`file://` allowed) |
+| `--tag` | yes | Template version: an existing git tag on that repository |
+| `--project` | no | Project git repository; default current working directory |
+| `--message` | no | Commit message; default `Connect tembiter to <identity>@<tag>` |
+
+`--tag` is required on this path. If the template has tags and `--tag` is omitted or unknown, adopt fails and lists the tags. It does not pick a tag silently.
+
+If the template has no tags, adopt fails without inventing a version. The no-tags assistance path is not this command's silent default.
+
 `npm test` compiles the package and runs the tests.
 
 ## Product requirements

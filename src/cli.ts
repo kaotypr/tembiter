@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { printAdoptUsage, runAdopt } from "./commands/adopt.js";
 import { printInitUsage, runInit } from "./commands/init.js";
 
 const PACKAGE_NAME = "tembiter";
@@ -11,6 +12,9 @@ function printUsage(stream: NodeJS.WritableStream): void {
   stream.write("Usage:\n");
   stream.write(
     "  tembiter init --template <path-or-url> --target <dir> --tag <git-tag> [--message <text>]\n",
+  );
+  stream.write(
+    "  tembiter adopt --template <path-or-url> --tag <git-tag> [--project <dir>] [--message <text>]\n",
   );
   stream.write("  tembiter --help\n");
   stream.write("  tembiter --version\n");
@@ -35,6 +39,14 @@ function main(argv: string[]): number {
       return 0;
     }
     return runInit(args.slice(1));
+  }
+
+  if (args[0] === "adopt") {
+    if (args.length === 2 && (args[1] === "--help" || args[1] === "-h")) {
+      printAdoptUsage(process.stdout);
+      return 0;
+    }
+    return runAdopt(args.slice(1));
   }
 
   process.stderr.write(`Not implemented: ${args[0]}\n`);
