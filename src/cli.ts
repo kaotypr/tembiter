@@ -14,7 +14,7 @@ function printUsage(stream: NodeJS.WritableStream): void {
     "  tembiter init --template <path-or-url> --target <dir> --tag <git-tag> [--message <text>]\n",
   );
   stream.write(
-    "  tembiter adopt --template <path-or-url> --tag <git-tag> [--project <dir>] [--message <text>]\n",
+    "  tembiter adopt --template <path-or-url> [--tag <git-tag>] [--project <dir>] [--message <text>]\n",
   );
   stream.write("  tembiter --help\n");
   stream.write("  tembiter --version\n");
