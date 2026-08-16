@@ -31,6 +31,19 @@ npx --package . tembiter init \
 
 `tembiter init` copies that tag's file tree into `--target` (it does not clone the template as the project repository), writes `.tembiter/config.json` with the template identity and tag, runs `git init`, and creates one commit.
 
+### Register a template
+
+```sh
+npx --package . tembiter template register --path /path/to/template
+```
+
+| Flag | Required | Meaning |
+| --- | --- | --- |
+| `--path` | no | Git repository to mark; default current working directory |
+| `--message` | no | Commit message; default `Register tembiter template` |
+
+`tembiter template register` writes `.tembiter/config.json` with `kind: "template"` and creates one new commit of `.tembiter/` only. It does not create git tags. Tagging template versions is the repository owner's git operation (`git tag`).
+
 `npm test` compiles the package and runs the tests.
 
 ## Product requirements
