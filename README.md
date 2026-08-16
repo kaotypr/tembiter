@@ -13,6 +13,21 @@ npx --package . tembiter --help
 npx --package . tembiter --version
 ```
 
+### Interactive setup
+
+On a terminal, `npx tembiter` with no arguments opens a numbered picker of the four setup commands (`init`, `template register`, `adopt`, `skill install`), then prompts for that command's options. Prompt labels match the flag names (`--template`, `--target`, `--tag`, `--message`, `--path`, `--project`, `--skill`). Optional flags can be left empty to keep the same defaults as the flags path.
+
+Running a setup subcommand on a terminal without its required flags continues in those prompts instead of only printing usage. If every required flag is already present, tembiter does not prompt.
+
+Scripts, CI, and pipes should not wait at a prompt. When stdin is not a TTY, or when `--non-interactive` is passed, missing flags stay a non-zero usage error. No-args in that mode prints usage and exits 0.
+
+```sh
+npx tembiter --non-interactive init \
+  --template /path/to/template \
+  --target /path/to/new-project \
+  --tag v1.0.0
+```
+
 ### Start a new project
 
 ```sh
