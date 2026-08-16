@@ -66,6 +66,30 @@ npx --package . tembiter adopt \
 
 If the template has no tags, omit `--tag`. adopt prints the project's first-commit date, the latest template commit from that calendar day, and a suggested `git tag` command. This is assistance only: tembiter does not create the tag and does not write `.tembiter/`. After the template owner creates a tag (any name they choose) on that commit, re-run adopt with `--tag`.
 
+### Install a packaged skill
+
+Skills ship in this package. They are not scraped from a template. Stub `SKILL.md` files are installable placeholders; the full agent update procedure is filled in later (plan 0008).
+
+```sh
+npx --package . tembiter skill install \
+  --skill apply-template-update \
+  --path /path/to/project
+```
+
+| Flag | Required | Meaning |
+| --- | --- | --- |
+| `--skill` | yes | Catalog id |
+| `--path` | yes | Template or project repository root (no default) |
+
+| Skill id | Purpose |
+| --- | --- |
+| `apply-template-update` | project |
+| `prepare-template` | template |
+
+Installing a skill onto the other kind of repository fails. Canonical files go under `<path>/.agents/skills/<id>/`, not under `.tembiter/`.
+
+If `<path>/.claude` already exists, tembiter creates `.claude/skills/` when needed and adds a symlink `.claude/skills/<id>` → `../../.agents/skills/<id>`. If `.claude` is absent, host linking is skipped and `.claude` is not created. A regular file already at the host skill path is an error.
+
 `npm test` compiles the package and runs the tests.
 
 ## Product requirements

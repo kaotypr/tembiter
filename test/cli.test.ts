@@ -33,13 +33,14 @@ describe("tembiter CLI", () => {
     assert.ok(result.stdout.length > 0);
   });
 
-  it("--help exits 0 and lists init, template register, and adopt", () => {
+  it("--help exits 0 and lists the four setup commands", () => {
     const result = runCli(["--help"]);
     assert.equal(result.status, 0);
     assert.match(result.stdout, /tembiter/);
     assert.match(result.stdout, /init/);
     assert.match(result.stdout, /template register/);
     assert.match(result.stdout, /adopt/);
+    assert.match(result.stdout, /skill install/);
     assert.doesNotMatch(result.stdout, /Setup commands are not implemented/);
   });
 
@@ -68,6 +69,13 @@ describe("tembiter CLI", () => {
     assert.match(result.stdout, /--message/);
   });
 
+  it("skill install --help names --skill and --path", () => {
+    const result = runCli(["skill", "install", "--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /--skill/);
+    assert.match(result.stdout, /--path/);
+  });
+
   it("--version prints 0.0.1-alpha.2", () => {
     const result = runCli(["--version"]);
     assert.equal(result.status, 0);
@@ -76,13 +84,6 @@ describe("tembiter CLI", () => {
 
   it("an unknown subcommand exits non-zero", () => {
     const result = runCli(["not-a-command"]);
-    assert.notEqual(result.status, 0);
-    assert.notEqual(result.status, null);
-    assert.match(result.stderr, /Not implemented/);
-  });
-
-  it("skill install stays unimplemented", () => {
-    const result = runCli(["skill", "install"]);
     assert.notEqual(result.status, 0);
     assert.notEqual(result.status, null);
     assert.match(result.stderr, /Not implemented/);
