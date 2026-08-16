@@ -38,14 +38,22 @@ export function printAdoptUsage(stream: NodeJS.WritableStream): void {
   stream.write(
     "  tembiter adopt --template <path-or-url> --tag <git-tag> [--project <dir>] [--message <text>]\n",
   );
+  stream.write(
+    "  tembiter adopt --template <path-or-url> [--project <dir>]\n",
+  );
   stream.write("\n");
   stream.write(
     "Bind an existing project git repository to a tagged template without copying template files.\n",
   );
+  stream.write(
+    "When the template has no tags, omit --tag. adopt prints first-commit-date assistance and a suggested git tag command; it does not write .tembiter/ or create the tag.\n",
+  );
   stream.write("\n");
   stream.write("Flags:\n");
   stream.write("  --template  Local git repository path or git URL (file:// allowed)\n");
-  stream.write("  --tag       Template version: an existing git tag on that repository\n");
+  stream.write(
+    "  --tag       Existing git tag (required when the template has tags; omit when it has none)\n",
+  );
   stream.write("  --project   Project git repository (default: current working directory)\n");
   stream.write(
     "  --message   Commit message (default: Connect tembiter to <identity>@<tag>)\n",
@@ -145,9 +153,9 @@ function formatTagList(tags: string[]): string {
   return tags.map((tag) => `  ${tag}`).join("\n");
 }
 
-function noTagsError(): CliError {
+function unknownTagOnUntaggedError(tag: string): CliError {
   return new CliError(
-    "Template has no version tags. This command does not invent a version. The no-tags fallback is not this command's silent default.",
+    `Tag '${tag}' was not found in the template. Template has no version tags. This command does not invent a version or create tags. Omit --tag to print first-commit-date assistance.`,
   );
 }
 
@@ -160,6 +168,171 @@ function missingOrUnknownTagError(tag: string | undefined, tags: string[]): CliE
   }
   return new CliError(
     `Tag '${tag}' was not found in the template. Existing tags:\n${list}\nPass --tag with one of these tags.`,
+  );
+}
+
+function calendarDayFromCommitterIso(iso: string): string {
+  if (iso.length < 10) {
+    throw new CliError(`Could not read committer calendar day from: ${iso}`);
+  }
+  return iso.slice(0, 10);
+}
+
+function compactDay(day: string): string {
+  return day.replaceAll("-", "");
+}
+
+function projectRootCommits(projectRoot: string, env: NodeJS.ProcessEnv): string[] {
+  try {
+    const text = gitText(["rev-list", "--max-parents=0", "HEAD"], {
+      cwd: projectRoot,
+      env,
+    });
+    if (text.length === 0) {
+      return [];
+    }
+    return text.split("\n").filter((line) => line.length > 0);
+  } catch (err) {
+    if (err instanceof GitError) {
+      throw new CliError(
+        `Could not read the project's first commit. The project must have git history. ${err.message}`,
+      );
+    }
+    throw err;
+  }
+}
+
+type TemplateCommit = {
+  sha: string;
+  unix: number;
+  day: string;
+  subject: string;
+};
+
+function listTemplateCommits(repoPath: string, env: NodeJS.ProcessEnv): TemplateCommit[] {
+  const text = gitText(["log", "--all", "--format=%H%x00%ct%x00%ci%x00%s"], {
+    cwd: repoPath,
+    env,
+  });
+  if (text.length === 0) {
+    return [];
+  }
+
+  const commits: TemplateCommit[] = [];
+  for (const line of text.split("\n")) {
+    if (line.length === 0) {
+      continue;
+    }
+    const parts = line.split("\0");
+    const sha = parts[0];
+    const unixText = parts[1];
+    const iso = parts[2];
+    if (sha === undefined || unixText === undefined || iso === undefined) {
+      continue;
+    }
+    const unix = Number(unixText);
+    if (sha.length === 0 || !Number.isFinite(unix)) {
+      continue;
+    }
+    commits.push({
+      sha,
+      unix,
+      day: calendarDayFromCommitterIso(iso),
+      subject: parts.slice(3).join("\0"),
+    });
+  }
+  return commits;
+}
+
+function printNoTagsAssistance(
+  stream: NodeJS.WritableStream,
+  projectRoot: string,
+  template: string,
+  repoPath: string,
+  env: NodeJS.ProcessEnv,
+): void {
+  const roots = projectRootCommits(projectRoot, env);
+  if (roots.length === 0) {
+    throw new CliError(
+      "Project has no commits. tembiter adopt needs a single first commit to compute the first-commit date.",
+    );
+  }
+  if (roots.length > 1) {
+    const list = roots.map((sha) => `  ${sha}`).join("\n");
+    throw new CliError(
+      `Project has more than one root commit. tembiter adopt needs a single first commit to compute the first-commit date. Do not guess among:\n${list}`,
+    );
+  }
+
+  const firstSha = roots[0];
+  if (firstSha === undefined) {
+    throw new CliError(
+      "Project has no commits. tembiter adopt needs a single first commit to compute the first-commit date.",
+    );
+  }
+
+  let firstIso: string;
+  try {
+    firstIso = gitText(["log", "-1", "--format=%ci", firstSha], {
+      cwd: projectRoot,
+      env,
+    });
+  } catch (err) {
+    if (err instanceof GitError) {
+      throw new CliError(`Could not read the first commit's committer date. ${err.message}`);
+    }
+    throw err;
+  }
+
+  const day = calendarDayFromCommitterIso(firstIso);
+
+  let commits: TemplateCommit[];
+  try {
+    commits = listTemplateCommits(repoPath, env);
+  } catch (err) {
+    if (err instanceof GitError) {
+      throw new CliError(`Could not list template commits. ${err.message}`);
+    }
+    throw err;
+  }
+
+  const matches = commits.filter((commit) => commit.day === day);
+  if (matches.length === 0) {
+    throw new CliError(
+      `No template commit has committer calendar day ${day} (the project's first-commit date). Nothing was written under .tembiter/.`,
+    );
+  }
+
+  matches.sort((a, b) => {
+    if (b.unix !== a.unix) {
+      return b.unix - a.unix;
+    }
+    return a.sha.localeCompare(b.sha);
+  });
+  const candidate = matches[0];
+  if (candidate === undefined) {
+    throw new CliError(
+      `No template commit has committer calendar day ${day} (the project's first-commit date). Nothing was written under .tembiter/.`,
+    );
+  }
+
+  const yyyymmdd = compactDay(day);
+  stream.write(
+    "Template has no version tags. This is assistance only; tembiter will not create a tag or write .tembiter/.\n",
+  );
+  stream.write("\n");
+  stream.write(`Project first-commit date: ${day}\n`);
+  stream.write(`Candidate commit: ${candidate.sha}\n`);
+  stream.write(`Subject: ${candidate.subject}\n`);
+  stream.write("\n");
+  stream.write("Suggested tag command (choose any tag name):\n");
+  stream.write(
+    `  git -C ${template} tag v0.0.0-tembiter-${yyyymmdd} ${candidate.sha}\n`,
+  );
+  stream.write("\n");
+  stream.write("After the template owner creates a tag, re-run:\n");
+  stream.write(
+    `  tembiter adopt --template ${template} --tag <tag> [--project <dir>]\n`,
   );
 }
 
@@ -290,6 +463,7 @@ export function adoptFromFlags(
   flags: AdoptFlags,
   env: NodeJS.ProcessEnv = process.env,
   cwd: string = process.cwd(),
+  stdout: NodeJS.WritableStream = process.stdout,
 ): void {
   if (flags.template === undefined || flags.template.length === 0) {
     throw new CliError("Missing required flags: --template.", {
@@ -316,7 +490,13 @@ export function adoptFromFlags(
     }
 
     if (tags.length === 0) {
-      throw noTagsError();
+      if (tag !== undefined && tag.length > 0) {
+        throw unknownTagOnUntaggedError(tag);
+      }
+      printNoTagsAssistance(stdout, projectRoot, template, repoPath, env);
+      throw new CliError(
+        "Did not bind the project. Create a tag on the candidate commit, then re-run adopt with --tag.",
+      );
     }
 
     if (tag === undefined || tag.length === 0 || !tagExists(repoPath, tag)) {

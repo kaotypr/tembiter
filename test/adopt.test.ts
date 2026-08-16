@@ -312,22 +312,11 @@ describe("tembiter adopt", () => {
     assert.equal(existsSync(join(project.repo, ".tembiter", "config.json")), false);
   });
 
-  it("fails when the template has no tags without inventing a version", () => {
+  it("fails when --tag is passed and the template has no tags", () => {
     const root = tempDir();
     const tagged = createTaggedTemplate(root);
     const untagged = createUntaggedTemplate(root, tagged.env);
     const project = createProjectFixture(root, tagged.env);
-
-    const omitted = runCli(
-      ["adopt", "--template", untagged, "--project", project.repo],
-      tagged.env,
-    );
-    assert.notEqual(omitted.status, 0);
-    assert.notEqual(omitted.status, null);
-    assert.match(omitted.stderr, /no version tags/);
-    assert.match(omitted.stderr, /does not invent a version/);
-    assert.match(omitted.stderr, /not this command's silent default/);
-    assert.doesNotMatch(omitted.stderr, /\d{4}-\d{2}-\d{2}/);
 
     const withTag = runCli(
       ["adopt", "--template", untagged, "--tag", "v1.0.0", "--project", project.repo],
@@ -335,8 +324,10 @@ describe("tembiter adopt", () => {
     );
     assert.notEqual(withTag.status, 0);
     assert.notEqual(withTag.status, null);
+    assert.match(withTag.stderr, /not found/);
     assert.match(withTag.stderr, /no version tags/);
     assert.match(withTag.stderr, /does not invent a version/);
+    assert.doesNotMatch(withTag.stdout, /Candidate commit:/);
     assert.equal(existsSync(join(project.repo, ".tembiter", "config.json")), false);
     assert.equal(
       gitText(["rev-list", "--count", "HEAD"], { cwd: project.repo, env: tagged.env }),
