@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { printInitUsage, runInit } from "./commands/init.js";
+import { printSkillInstallUsage, runSkillInstall } from "./commands/skill-install.js";
 
 const PACKAGE_NAME = "tembiter";
 const PACKAGE_VERSION = "0.0.1-alpha.2";
@@ -12,6 +13,7 @@ function printUsage(stream: NodeJS.WritableStream): void {
   stream.write(
     "  tembiter init --template <path-or-url> --target <dir> --tag <git-tag> [--message <text>]\n",
   );
+  stream.write("  tembiter skill install --skill <id> --path <dir>\n");
   stream.write("  tembiter --help\n");
   stream.write("  tembiter --version\n");
 }
@@ -35,6 +37,14 @@ function main(argv: string[]): number {
       return 0;
     }
     return runInit(args.slice(1));
+  }
+
+  if (args[0] === "skill" && args[1] === "install") {
+    if (args.length === 3 && (args[2] === "--help" || args[2] === "-h")) {
+      printSkillInstallUsage(process.stdout);
+      return 0;
+    }
+    return runSkillInstall(args.slice(2));
   }
 
   process.stderr.write(`Not implemented: ${args[0]}\n`);
