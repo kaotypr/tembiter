@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
 import {
   parseAdoptFlags,
   printAdoptUsage,
@@ -37,7 +38,16 @@ import {
 } from "./ui/prompt.js";
 
 const PACKAGE_NAME = "tembiter";
-const PACKAGE_VERSION = "0.0.1-alpha.2";
+const PACKAGE_VERSION = readPackageVersion();
+
+function readPackageVersion(): string {
+  const packageJsonPath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json");
+  const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version?: unknown };
+  if (typeof pkg.version !== "string" || pkg.version.length === 0) {
+    throw new Error(`package.json is missing a version at ${packageJsonPath}`);
+  }
+  return pkg.version;
+}
 
 export type MainOptions = {
   stdin?: NodeJS.ReadableStream & TtyLike;

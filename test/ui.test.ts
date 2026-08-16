@@ -18,7 +18,11 @@ import { gitText, runGit } from "../src/git.js";
 import { formatPickerMenu, pickerLabels } from "../src/ui/picker.js";
 import type { PromptIo } from "../src/ui/prompt.js";
 
-const cliPath = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "cli.js");
+const here = dirname(fileURLToPath(import.meta.url));
+const cliPath = join(here, "..", "src", "cli.js");
+const packageJson = JSON.parse(
+  readFileSync(join(here, "..", "..", "package.json"), "utf8"),
+) as { version: string };
 
 const tempDirs: string[] = [];
 
@@ -465,6 +469,6 @@ describe("interactive setup UI", () => {
       prompt: throwingPrompt(),
     });
     assert.equal(version.status, 0);
-    assert.match(version.stdout.trim(), /^0\.0\.1-alpha\.2$/);
+    assert.equal(version.stdout.trim(), packageJson.version);
   });
 });
