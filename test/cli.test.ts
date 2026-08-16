@@ -9,15 +9,18 @@ const cliPath = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "cli.
 function runCli(args: string[]): {
   status: number | null;
   stdout: string;
+  stderr: string;
   error: Error | undefined;
 } {
   const result = spawnSync(process.execPath, [cliPath, ...args], {
     encoding: "utf8",
   });
   const stdout = typeof result.stdout === "string" ? result.stdout : "";
+  const stderr = typeof result.stderr === "string" ? result.stderr : "";
   return {
     status: result.status,
     stdout,
+    stderr,
     error: result.error,
   };
 }
@@ -30,10 +33,21 @@ describe("tembiter CLI", () => {
     assert.ok(result.stdout.length > 0);
   });
 
-  it("--help exits 0 and mentions tembiter", () => {
+  it("--help exits 0 and lists init", () => {
     const result = runCli(["--help"]);
     assert.equal(result.status, 0);
     assert.match(result.stdout, /tembiter/);
+    assert.match(result.stdout, /init/);
+    assert.doesNotMatch(result.stdout, /Setup commands are not implemented/);
+  });
+
+  it("init --help names the four flags", () => {
+    const result = runCli(["init", "--help"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /--template/);
+    assert.match(result.stdout, /--target/);
+    assert.match(result.stdout, /--tag/);
+    assert.match(result.stdout, /--message/);
   });
 
   it("--version prints 0.0.1-alpha.2", () => {
@@ -46,5 +60,14 @@ describe("tembiter CLI", () => {
     const result = runCli(["not-a-command"]);
     assert.notEqual(result.status, 0);
     assert.notEqual(result.status, null);
+    assert.match(result.stderr, /Not implemented/);
+  });
+
+  it("template register, adopt, and skill install stay unimplemented", () => {
+    for (const args of [["template", "register"], ["adopt"], ["skill", "install"]]) {
+      const result = runCli(args);
+      assert.notEqual(result.status, 0);
+      assert.notEqual(result.status, null);
+    }
   });
 });
