@@ -68,7 +68,7 @@ If the template has no tags, omit `--tag`. adopt prints the project's first-comm
 
 ### Install a packaged skill
 
-Skills ship in this package. They are not scraped from a template. Stub `SKILL.md` files are installable placeholders; the full agent update procedure is filled in later (plan 0008).
+Skills ship in this package. They are not scraped from a template. Install them with `tembiter skill install` onto a template or a connected project.
 
 ```sh
 npx --package . tembiter skill install \
@@ -89,6 +89,14 @@ npx --package . tembiter skill install \
 Installing a skill onto the other kind of repository fails. Canonical files go under `<path>/.agents/skills/<id>/`, not under `.tembiter/`.
 
 If `<path>/.claude` already exists, tembiter creates `.claude/skills/` when needed and adds a symlink `.claude/skills/<id>` → `../../.agents/skills/<id>`. If `.claude` is absent, host linking is skipped and `.claude` is not created. A regular file already at the host skill path is an error.
+
+### Later template updates
+
+After setup, later bumps are an **AI agent** workflow using the skills installed by `tembiter skill install`. The agent works on a reviewable branch, judges template vs project-specific changes, refreshes `.tembiter/config.json`, and **merges locally** by default. Optionally it may open an MR/PR if a git host is already configured.
+
+The CLI is **setup only** (`init`, `template register`, `adopt`, `skill install`). Do not run the CLI for a later bump. There is no human update command.
+
+Install `apply-template-update` on a connected project before asking an agent to apply a later template tag. Install `prepare-template` on a template so the owner keeps `.tembiter/config.json` and git tags.
 
 `npm test` compiles the package and runs the tests.
 
