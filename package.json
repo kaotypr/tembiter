@@ -15,7 +15,8 @@
     "test": "tsc && node --test 'dist/test/**/*.test.js'"
   },
   "files": [
-    "dist/src"
+    "dist/src",
+    "skills"
   ],
   "devDependencies": {
     "@types/node": "^20.19.11",
