@@ -1,4 +1,6 @@
 import { createInterface } from "node:readline/promises";
+import { cyan, type TtyStream } from "./color.js";
+import { selectChoice, type SelectChoice } from "./select.js";
 
 export class PromptCancelled extends Error {
   constructor(message = "Cancelled") {
@@ -7,8 +9,11 @@ export class PromptCancelled extends Error {
   }
 }
 
+export type { SelectChoice };
+
 export type PromptIo = {
   question(query: string): Promise<string>;
+  select<T = string[]>(choices: readonly SelectChoice<T>[]): Promise<T>;
   write(text: string): void;
   close(): void;
 };
@@ -27,19 +32,25 @@ export function detectInteractive(
 
 export function createReadlinePrompt(
   input: NodeJS.ReadableStream = process.stdin,
-  output: NodeJS.WritableStream = process.stdout,
+  output: NodeJS.WritableStream & TtyStream = process.stdout,
 ): PromptIo {
-  const rl = createInterface({ input, output });
+  let rl: ReturnType<typeof createInterface> | undefined;
   let closed = false;
 
   const cancel = (): void => {
     closed = true;
-    rl.close();
+    rl?.close();
   };
 
-  rl.on("SIGINT", cancel);
+  const getRl = (): ReturnType<typeof createInterface> => {
+    if (rl === undefined) {
+      rl = createInterface({ input, output });
+      rl.on("SIGINT", cancel);
+    }
+    return rl;
+  };
 
-  return {
+  const prompt: PromptIo = {
     write(text: string) {
       output.write(text);
     },
@@ -48,7 +59,7 @@ export function createReadlinePrompt(
         throw new PromptCancelled();
       }
       try {
-        return await rl.question(query);
+        return await getRl().question(cyan(query, { stream: output }));
       } catch (err) {
         if (closed || (err instanceof Error && err.name === "AbortError")) {
           throw new PromptCancelled();
@@ -56,13 +67,25 @@ export function createReadlinePrompt(
         throw err;
       }
     },
+    async select<T = string[]>(choices: readonly SelectChoice<T>[]): Promise<T> {
+      if (closed) {
+        throw new PromptCancelled();
+      }
+      return selectChoice(choices, {
+        stdin: input,
+        stdout: output,
+        question: (query) => prompt.question(query),
+      });
+    },
     close() {
       if (!closed) {
         closed = true;
-        rl.close();
+        rl?.close();
       }
     },
   };
+
+  return prompt;
 }
 
 export async function promptFlag(

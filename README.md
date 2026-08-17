@@ -15,11 +15,11 @@ npx --package . tembiter --version
 
 ### Interactive setup
 
-On a terminal, `npx tembiter` with no arguments opens a numbered picker of the four setup commands (`init`, `template register`, `adopt`, `skill install`), then prompts for that command's options. Prompt labels match the flag names (`--template`, `--target`, `--tag`, `--message`, `--path`, `--project`, `--skill`). Optional flags can be left empty to keep the same defaults as the flags path.
+On a terminal, `npx tembiter` with no arguments shows a Tembiter welcome banner and an arrow-key list of the four setup commands (`init`, `template register`, `adopt`, `skill install`). Move with Up/Down or `j`/`k`, press Enter to confirm the highlight, or press `1`–`4` to select that command immediately. Then tembiter prompts for that command's options. Prompt labels match the flag names (`--template`, `--target`, `--tag`, `--message`, `--path`, `--project`, `--skill`). Optional flags can be left empty to keep the same defaults as the flags path.
 
-Running a setup subcommand on a terminal without its required flags continues in those prompts instead of only printing usage. If every required flag is already present, tembiter does not prompt.
+Running a setup subcommand on a terminal without its required flags continues in those prompts instead of only printing usage. It does not reprint the welcome banner. If every required flag is already present, tembiter does not prompt.
 
-Scripts, CI, and pipes should not wait at a prompt. When stdin is not a TTY, or when `--non-interactive` is passed, missing flags stay a non-zero usage error. No-args in that mode prints usage and exits 0.
+Scripts, CI, and pipes should not wait at a prompt. Use flags or `--non-interactive`. When stdin is not a TTY, or when `--non-interactive` is passed, missing flags stay a non-zero usage error. No-args in that mode prints usage and exits 0.
 
 ```sh
 npx tembiter --non-interactive init \
