@@ -27,6 +27,7 @@ import {
   runSkillInstall,
   type SkillInstallFlags,
 } from "./commands/skill-install.js";
+import { printBanner } from "./ui/banner.js";
 import { pickSetupCommand } from "./ui/picker.js";
 import {
   createReadlinePrompt,
@@ -353,6 +354,7 @@ export async function main(argv: string[], options: MainOptions = {}): Promise<n
         printUsage(process.stdout);
         return 0;
       }
+      printBanner(process.stdout, env);
       const picked = await pickSetupCommand(ensurePrompt());
       return await dispatch(picked, { ...ctx, fromPicker: true });
     }
