@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { projectConfig, templateConfig, writeConfig } from "../src/format/config.js";
-import { runGit } from "../src/git.js";
+import { gitText, runGit } from "../src/git.js";
 import { packageRoot } from "../src/skills/catalog.js";
 
 const cliPath = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "cli.js");
@@ -131,6 +131,20 @@ describe("tembiter skill install", () => {
       readFileSync(join(project.repo, ".tembiter", "config.json"), "utf8"),
       /"kind": "project"/,
     );
+    assert.match(
+      readFileSync(join(project.repo, ".gitignore"), "utf8"),
+      /^\.tembiter\/sync\/$/m,
+    );
+    assert.equal(
+      gitText(["rev-list", "--count", "HEAD"], { cwd: project.repo, env: project.env }),
+      "1",
+    );
+    const ignoreInHead = runGit(["cat-file", "-e", "HEAD:.gitignore"], {
+      cwd: project.repo,
+      env: project.env,
+      allowFailure: true,
+    });
+    assert.notEqual(ignoreInHead.status, 0);
   });
 
   it("installs tembiter-prepare-template onto a template (A9)", () => {
@@ -152,6 +166,14 @@ describe("tembiter skill install", () => {
     );
     assert.equal(readFileSync(installed, "utf8"), packagedSkillBody("tembiter-prepare-template"));
     assert.equal(existsSync(join(template.repo, ".claude")), false);
+    assert.match(
+      readFileSync(join(template.repo, ".gitignore"), "utf8"),
+      /^\.tembiter\/sync\/$/m,
+    );
+    assert.equal(
+      gitText(["rev-list", "--count", "HEAD"], { cwd: template.repo, env: template.env }),
+      "1",
+    );
   });
 
   it("fails when installing a project skill onto a template", () => {
@@ -168,6 +190,7 @@ describe("tembiter skill install", () => {
     assert.match(result.stderr, /project/);
     assert.match(result.stderr, /template/);
     assert.equal(existsSync(join(template.repo, ".agents")), false);
+    assert.equal(existsSync(join(template.repo, ".gitignore")), false);
   });
 
   it("fails when installing a template skill onto a project", () => {
@@ -184,6 +207,7 @@ describe("tembiter skill install", () => {
     assert.match(result.stderr, /template/);
     assert.match(result.stderr, /project/);
     assert.equal(existsSync(join(project.repo, ".agents")), false);
+    assert.equal(existsSync(join(project.repo, ".gitignore")), false);
   });
 
   it("symlinks into .claude/skills when .claude already exists (T37)", () => {
