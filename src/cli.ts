@@ -30,10 +30,15 @@ import {
 import { printBanner } from "./ui/banner.js";
 import { pickSetupCommand } from "./ui/picker.js";
 import {
+  createProgressReporter,
+  type ProgressReporter,
+} from "./ui/progress.js";
+import {
   createReadlinePrompt,
   detectInteractive,
   PromptCancelled,
   promptFlag,
+  type PromptFlagOptions,
   type PromptIo,
   type TtyLike,
 } from "./ui/prompt.js";
@@ -64,7 +69,87 @@ type CommandContext = {
   env: NodeJS.ProcessEnv;
   cwd: string;
   ensurePrompt: () => PromptIo;
+  closePrompt: () => void;
+  progress: ProgressReporter;
 };
+
+const INIT_FIELDS = {
+  template: {
+    title: "Template repository",
+    description: "Local git repository path or git URL (file:// allowed)",
+    required: true,
+  },
+  target: {
+    title: "New project directory",
+    description: "Destination directory (must not exist or must be empty)",
+    required: true,
+  },
+  tag: {
+    title: "Template version",
+    description: "An existing git tag on that repository",
+    required: true,
+  },
+  message: {
+    title: "First-commit message",
+    description: "Overrides the first commit message",
+    required: false,
+    defaultLabel: "Initial commit",
+  },
+} as const satisfies Record<string, PromptFlagOptions>;
+
+const REGISTER_FIELDS = {
+  path: {
+    title: "Template repository",
+    description: "Git repository to mark",
+    required: false,
+    defaultLabel: "current working directory",
+  },
+  message: {
+    title: "Commit message",
+    description: "Overrides the register commit message",
+    required: false,
+    defaultLabel: "Register tembiter template",
+  },
+} as const satisfies Record<string, PromptFlagOptions>;
+
+const ADOPT_FIELDS = {
+  template: {
+    title: "Template repository",
+    description: "Local git repository path or git URL (file:// allowed)",
+    required: true,
+  },
+  tag: {
+    title: "Template version",
+    description: "Existing git tag; omit when the template has no tags",
+    required: false,
+  },
+  project: {
+    title: "Project repository",
+    description: "Project git repository",
+    required: false,
+    defaultLabel: "current working directory",
+  },
+  message: {
+    title: "Commit message",
+    description: "Overrides the connect commit message",
+    required: false,
+    defaultLabel: "Connect tembiter to <identity>@<tag>",
+  },
+} as const satisfies Record<string, PromptFlagOptions>;
+
+const SKILL_INSTALL_FIELDS = {
+  skill: {
+    title: "Skill id",
+    description:
+      "Catalog id (tembiter-apply-template-update, tembiter-prepare-template)",
+    required: true,
+  },
+  path: {
+    title: "Repository root",
+    description: "Template or project repository root",
+    required: true,
+  },
+} as const satisfies Record<string, PromptFlagOptions>;
 
 function printUsage(stream: NodeJS.WritableStream): void {
   stream.write(`${PACKAGE_NAME} ${PACKAGE_VERSION}\n`);
@@ -131,134 +216,156 @@ async function assignOptional(
   flags: { [key: string]: string | boolean | undefined },
   key: string,
   io: PromptIo,
+  options: PromptFlagOptions,
 ): Promise<void> {
   if (flags[key] !== undefined) {
     return;
   }
-  const value = await promptFlag(io, key, { required: false });
+  const value = await promptFlag(io, key, options);
   if (value !== undefined) {
     flags[key] = value;
   }
 }
 
+function afterFill(ctx: CommandContext): void {
+  ctx.closePrompt();
+  process.stdout.write("\n");
+}
+
 async function fillInit(flags: InitFlags, io: PromptIo): Promise<void> {
   if (flags.template === undefined || flags.template.length === 0) {
-    flags.template = await promptFlag(io, "template", { required: true });
+    flags.template = await promptFlag(io, "template", INIT_FIELDS.template);
   }
   if (flags.target === undefined || flags.target.length === 0) {
-    flags.target = await promptFlag(io, "target", { required: true });
+    flags.target = await promptFlag(io, "target", INIT_FIELDS.target);
   }
   if (flags.tag === undefined || flags.tag.length === 0) {
-    flags.tag = await promptFlag(io, "tag", { required: true });
+    flags.tag = await promptFlag(io, "tag", INIT_FIELDS.tag);
   }
-  await assignOptional(flags, "message", io);
+  await assignOptional(flags, "message", io, INIT_FIELDS.message);
 }
 
 async function fillRegister(flags: RegisterFlags, io: PromptIo): Promise<void> {
-  await assignOptional(flags, "path", io);
-  await assignOptional(flags, "message", io);
+  await assignOptional(flags, "path", io, REGISTER_FIELDS.path);
+  await assignOptional(flags, "message", io, REGISTER_FIELDS.message);
 }
 
 async function fillAdopt(flags: AdoptFlags, io: PromptIo): Promise<void> {
   if (flags.template === undefined || flags.template.length === 0) {
-    flags.template = await promptFlag(io, "template", { required: true });
+    flags.template = await promptFlag(io, "template", ADOPT_FIELDS.template);
   }
-  await assignOptional(flags, "tag", io);
-  await assignOptional(flags, "project", io);
-  await assignOptional(flags, "message", io);
+  await assignOptional(flags, "tag", io, ADOPT_FIELDS.tag);
+  await assignOptional(flags, "project", io, ADOPT_FIELDS.project);
+  await assignOptional(flags, "message", io, ADOPT_FIELDS.message);
 }
 
 async function fillSkillInstall(flags: SkillInstallFlags, io: PromptIo): Promise<void> {
   if (flags.skill === undefined || flags.skill.length === 0) {
-    flags.skill = await promptFlag(io, "skill", { required: true });
+    flags.skill = await promptFlag(io, "skill", SKILL_INSTALL_FIELDS.skill);
   }
   if (flags.path === undefined || flags.path.length === 0) {
-    flags.path = await promptFlag(io, "path", { required: true });
+    flags.path = await promptFlag(io, "path", SKILL_INSTALL_FIELDS.path);
   }
 }
 
 async function handleInit(commandArgs: string[], ctx: CommandContext): Promise<number> {
+  const run = (args: string[]): number =>
+    runInit(args, { env: ctx.env, progress: ctx.progress });
+
   if (!ctx.interactive) {
-    return runInit(commandArgs, { env: ctx.env });
+    return run(commandArgs);
   }
 
   let flags: InitFlags;
   try {
     flags = parseInitFlags(commandArgs);
   } catch {
-    return runInit(commandArgs, { env: ctx.env });
+    return run(commandArgs);
   }
   if (flags.help) {
-    return runInit(commandArgs, { env: ctx.env });
+    return run(commandArgs);
   }
   if (ctx.fromPicker || missingInit(flags).length > 0) {
     await fillInit(flags, ctx.ensurePrompt());
-    return runInit(flagArgs(flags), { env: ctx.env });
+    afterFill(ctx);
+    return run(flagArgs(flags));
   }
-  return runInit(commandArgs, { env: ctx.env });
+  return run(commandArgs);
 }
 
 async function handleRegister(commandArgs: string[], ctx: CommandContext): Promise<number> {
+  const run = (args: string[]): number =>
+    runRegister(args, { env: ctx.env, progress: ctx.progress });
+
   if (!ctx.interactive) {
-    return runRegister(commandArgs, { env: ctx.env });
+    return run(commandArgs);
   }
 
   let flags: RegisterFlags;
   try {
     flags = parseRegisterFlags(commandArgs);
   } catch {
-    return runRegister(commandArgs, { env: ctx.env });
+    return run(commandArgs);
   }
   if (flags.help) {
-    return runRegister(commandArgs, { env: ctx.env });
+    return run(commandArgs);
   }
   if (ctx.fromPicker) {
     await fillRegister(flags, ctx.ensurePrompt());
-    return runRegister(flagArgs(flags), { env: ctx.env });
+    afterFill(ctx);
+    return run(flagArgs(flags));
   }
-  return runRegister(commandArgs, { env: ctx.env });
+  return run(commandArgs);
 }
 
 async function handleAdopt(commandArgs: string[], ctx: CommandContext): Promise<number> {
+  const run = (args: string[]): number =>
+    runAdopt(args, { env: ctx.env, cwd: ctx.cwd, progress: ctx.progress });
+
   if (!ctx.interactive) {
-    return runAdopt(commandArgs, { env: ctx.env, cwd: ctx.cwd });
+    return run(commandArgs);
   }
 
   let flags: AdoptFlags;
   try {
     flags = parseAdoptFlags(commandArgs);
   } catch {
-    return runAdopt(commandArgs, { env: ctx.env, cwd: ctx.cwd });
+    return run(commandArgs);
   }
   if (flags.help) {
-    return runAdopt(commandArgs, { env: ctx.env, cwd: ctx.cwd });
+    return run(commandArgs);
   }
   if (ctx.fromPicker || missingAdopt(flags).length > 0) {
     await fillAdopt(flags, ctx.ensurePrompt());
-    return runAdopt(flagArgs(flags), { env: ctx.env, cwd: ctx.cwd });
+    afterFill(ctx);
+    return run(flagArgs(flags));
   }
-  return runAdopt(commandArgs, { env: ctx.env, cwd: ctx.cwd });
+  return run(commandArgs);
 }
 
 async function handleSkillInstall(commandArgs: string[], ctx: CommandContext): Promise<number> {
+  const run = (args: string[]): number =>
+    runSkillInstall(args, { progress: ctx.progress });
+
   if (!ctx.interactive) {
-    return runSkillInstall(commandArgs);
+    return run(commandArgs);
   }
 
   let flags: SkillInstallFlags;
   try {
     flags = parseSkillInstallFlags(commandArgs);
   } catch {
-    return runSkillInstall(commandArgs);
+    return run(commandArgs);
   }
   if (flags.help) {
-    return runSkillInstall(commandArgs);
+    return run(commandArgs);
   }
   if (ctx.fromPicker || missingSkillInstall(flags).length > 0) {
     await fillSkillInstall(flags, ctx.ensurePrompt());
-    return runSkillInstall(flagArgs(flags));
+    afterFill(ctx);
+    return run(flagArgs(flags));
   }
-  return runSkillInstall(commandArgs);
+  return run(commandArgs);
 }
 
 async function dispatch(args: string[], ctx: CommandContext): Promise<number> {
@@ -331,6 +438,7 @@ export async function main(argv: string[], options: MainOptions = {}): Promise<n
 
   let prompt = options.prompt;
   let createdPrompt = false;
+  const progress = createProgressReporter(stdout);
 
   const ensurePrompt = (): PromptIo => {
     if (prompt === undefined) {
@@ -340,12 +448,18 @@ export async function main(argv: string[], options: MainOptions = {}): Promise<n
     return prompt;
   };
 
+  const closePrompt = (): void => {
+    prompt?.close();
+  };
+
   const ctx: CommandContext = {
     interactive,
     fromPicker: false,
     env,
     cwd,
     ensurePrompt,
+    closePrompt,
+    progress,
   };
 
   try {
