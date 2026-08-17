@@ -8,8 +8,8 @@ const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const requiredPaths = [
   "dist/src/cli.js",
-  "skills/apply-template-update/SKILL.md",
-  "skills/prepare-template/SKILL.md",
+  "skills/tembiter-apply-template-update/SKILL.md",
+  "skills/tembiter-prepare-template/SKILL.md",
   "README.md",
   "LICENSE",
   "package.json",
@@ -57,5 +57,7 @@ describe("npm pack contents", () => {
     for (const required of requiredPaths) {
       assert.ok(paths.includes(required), `missing ${required} in ${JSON.stringify(paths)}`);
     }
+    assert.equal(paths.includes("skills/apply-template-update/SKILL.md"), false);
+    assert.equal(paths.includes("skills/prepare-template/SKILL.md"), false);
   });
 });

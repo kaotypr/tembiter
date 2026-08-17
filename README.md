@@ -92,7 +92,7 @@ Skills ship in this package. They are not scraped from a template. Install them 
 
 ```sh
 npx tembiter skill install \
-  --skill apply-template-update \
+  --skill tembiter-apply-template-update \
   --path /path/to/project
 ```
 
@@ -103,8 +103,8 @@ npx tembiter skill install \
 
 | Skill id | Purpose |
 | --- | --- |
-| `apply-template-update` | project |
-| `prepare-template` | template |
+| `tembiter-apply-template-update` | project |
+| `tembiter-prepare-template` | template |
 
 Installing a skill onto the other kind of repository fails. Canonical files go under `<path>/.agents/skills/<id>/`, not under `.tembiter/`.
 
@@ -116,7 +116,7 @@ After setup, later bumps are an **AI agent** workflow using the skills installed
 
 The CLI is **setup only** (`init`, `template register`, `adopt`, `skill install`). Do not run the CLI for a later bump. There is no human update command.
 
-Install `apply-template-update` on a connected project before asking an agent to apply a later template tag. Install `prepare-template` on a template so the owner keeps `.tembiter/config.json` and git tags.
+Install `tembiter-apply-template-update` on a connected project before asking an agent to apply a later template tag. Install `tembiter-prepare-template` on a template so the owner keeps `.tembiter/config.json` and git tags.
 
 `npm test` compiles the package and runs the tests.
 

@@ -100,20 +100,31 @@ describe("tembiter skill install", () => {
     assert.equal(result.status, 0);
     assert.match(result.stdout, /--skill/);
     assert.match(result.stdout, /--path/);
+    assert.match(result.stdout, /tembiter-apply-template-update/);
+    assert.match(result.stdout, /tembiter-prepare-template/);
   });
 
-  it("installs apply-template-update onto a project (A9)", () => {
+  it("installs tembiter-apply-template-update onto a project (A9)", () => {
     const root = tempDir();
     const project = createRepo(root, "project", "project");
 
     const result = runCli(
-      ["skill", "install", "--skill", "apply-template-update", "--path", project.repo],
+      ["skill", "install", "--skill", "tembiter-apply-template-update", "--path", project.repo],
       project.env,
     );
 
     assert.equal(result.status, 0, result.stderr);
-    const installed = join(project.repo, ".agents", "skills", "apply-template-update", "SKILL.md");
-    assert.equal(readFileSync(installed, "utf8"), packagedSkillBody("apply-template-update"));
+    const installed = join(
+      project.repo,
+      ".agents",
+      "skills",
+      "tembiter-apply-template-update",
+      "SKILL.md",
+    );
+    assert.equal(
+      readFileSync(installed, "utf8"),
+      packagedSkillBody("tembiter-apply-template-update"),
+    );
     assert.equal(existsSync(join(project.repo, ".claude")), false);
     assert.equal(existsSync(join(project.repo, ".tembiter", "skills")), false);
     assert.match(
@@ -122,18 +133,24 @@ describe("tembiter skill install", () => {
     );
   });
 
-  it("installs prepare-template onto a template (A9)", () => {
+  it("installs tembiter-prepare-template onto a template (A9)", () => {
     const root = tempDir();
     const template = createRepo(root, "template", "template");
 
     const result = runCli(
-      ["skill", "install", "--skill", "prepare-template", "--path", template.repo],
+      ["skill", "install", "--skill", "tembiter-prepare-template", "--path", template.repo],
       template.env,
     );
 
     assert.equal(result.status, 0, result.stderr);
-    const installed = join(template.repo, ".agents", "skills", "prepare-template", "SKILL.md");
-    assert.equal(readFileSync(installed, "utf8"), packagedSkillBody("prepare-template"));
+    const installed = join(
+      template.repo,
+      ".agents",
+      "skills",
+      "tembiter-prepare-template",
+      "SKILL.md",
+    );
+    assert.equal(readFileSync(installed, "utf8"), packagedSkillBody("tembiter-prepare-template"));
     assert.equal(existsSync(join(template.repo, ".claude")), false);
   });
 
@@ -142,7 +159,7 @@ describe("tembiter skill install", () => {
     const template = createRepo(root, "template", "template");
 
     const result = runCli(
-      ["skill", "install", "--skill", "apply-template-update", "--path", template.repo],
+      ["skill", "install", "--skill", "tembiter-apply-template-update", "--path", template.repo],
       template.env,
     );
 
@@ -158,7 +175,7 @@ describe("tembiter skill install", () => {
     const project = createRepo(root, "project", "project");
 
     const result = runCli(
-      ["skill", "install", "--skill", "prepare-template", "--path", project.repo],
+      ["skill", "install", "--skill", "tembiter-prepare-template", "--path", project.repo],
       project.env,
     );
 
@@ -175,18 +192,18 @@ describe("tembiter skill install", () => {
     mkdirSync(join(project.repo, ".claude"));
 
     const result = runCli(
-      ["skill", "install", "--skill", "apply-template-update", "--path", project.repo],
+      ["skill", "install", "--skill", "tembiter-apply-template-update", "--path", project.repo],
       project.env,
     );
 
     assert.equal(result.status, 0, result.stderr);
-    const linkPath = join(project.repo, ".claude", "skills", "apply-template-update");
-    const destPath = join(project.repo, ".agents", "skills", "apply-template-update");
+    const linkPath = join(project.repo, ".claude", "skills", "tembiter-apply-template-update");
+    const destPath = join(project.repo, ".agents", "skills", "tembiter-apply-template-update");
     assert.equal(lstatSync(linkPath).isSymbolicLink(), true);
-    assert.equal(readlinkSync(linkPath), "../../.agents/skills/apply-template-update");
+    assert.equal(readlinkSync(linkPath), "../../.agents/skills/tembiter-apply-template-update");
     assert.equal(
       readFileSync(join(linkPath, "SKILL.md"), "utf8"),
-      packagedSkillBody("apply-template-update"),
+      packagedSkillBody("tembiter-apply-template-update"),
     );
     assert.equal(existsSync(destPath), true);
   });
@@ -196,14 +213,14 @@ describe("tembiter skill install", () => {
     const template = createRepo(root, "template", "template");
 
     const result = runCli(
-      ["skill", "install", "--skill", "prepare-template", "--path", template.repo],
+      ["skill", "install", "--skill", "tembiter-prepare-template", "--path", template.repo],
       template.env,
     );
 
     assert.equal(result.status, 0, result.stderr);
     assert.equal(existsSync(join(template.repo, ".claude")), false);
     assert.equal(
-      existsSync(join(template.repo, ".agents", "skills", "prepare-template", "SKILL.md")),
+      existsSync(join(template.repo, ".agents", "skills", "tembiter-prepare-template", "SKILL.md")),
       true,
     );
   });
@@ -213,13 +230,13 @@ describe("tembiter skill install", () => {
     const project = createRepo(root, "project", "project");
     mkdirSync(join(project.repo, ".claude", "skills"), { recursive: true });
     writeFileSync(
-      join(project.repo, ".claude", "skills", "apply-template-update"),
+      join(project.repo, ".claude", "skills", "tembiter-apply-template-update"),
       "not a symlink\n",
       "utf8",
     );
 
     const result = runCli(
-      ["skill", "install", "--skill", "apply-template-update", "--path", project.repo],
+      ["skill", "install", "--skill", "tembiter-apply-template-update", "--path", project.repo],
       project.env,
     );
 
@@ -227,7 +244,7 @@ describe("tembiter skill install", () => {
     assert.notEqual(result.status, null);
     assert.match(result.stderr, /not a symlink/);
     assert.equal(
-      readFileSync(join(project.repo, ".claude", "skills", "apply-template-update"), "utf8"),
+      readFileSync(join(project.repo, ".claude", "skills", "tembiter-apply-template-update"), "utf8"),
       "not a symlink\n",
     );
   });
@@ -237,20 +254,26 @@ describe("tembiter skill install", () => {
     const project = createRepo(root, "project", "project");
 
     const first = runCli(
-      ["skill", "install", "--skill", "apply-template-update", "--path", project.repo],
+      ["skill", "install", "--skill", "tembiter-apply-template-update", "--path", project.repo],
       project.env,
     );
     assert.equal(first.status, 0, first.stderr);
 
-    const installed = join(project.repo, ".agents", "skills", "apply-template-update", "SKILL.md");
+    const installed = join(
+      project.repo,
+      ".agents",
+      "skills",
+      "tembiter-apply-template-update",
+      "SKILL.md",
+    );
     writeFileSync(installed, "stale local copy\n", "utf8");
 
     const second = runCli(
-      ["skill", "install", "--skill", "apply-template-update", "--path", project.repo],
+      ["skill", "install", "--skill", "tembiter-apply-template-update", "--path", project.repo],
       project.env,
     );
     assert.equal(second.status, 0, second.stderr);
-    assert.equal(readFileSync(installed, "utf8"), packagedSkillBody("apply-template-update"));
+    assert.equal(readFileSync(installed, "utf8"), packagedSkillBody("tembiter-apply-template-update"));
   });
 
   it("fails for an unknown skill id", () => {
@@ -265,7 +288,42 @@ describe("tembiter skill install", () => {
     assert.notEqual(result.status, 0);
     assert.notEqual(result.status, null);
     assert.match(result.stderr, /Unknown skill/);
-    assert.match(result.stderr, /apply-template-update/);
+    assert.match(result.stderr, /tembiter-apply-template-update/);
+    assert.match(result.stderr, /tembiter-prepare-template/);
+  });
+
+  it("treats unprefixed apply-template-update as unknown", () => {
+    const root = tempDir();
+    const project = createRepo(root, "project", "project");
+
+    const result = runCli(
+      ["skill", "install", "--skill", "apply-template-update", "--path", project.repo],
+      project.env,
+    );
+
+    assert.notEqual(result.status, 0);
+    assert.notEqual(result.status, null);
+    assert.match(result.stderr, /Unknown skill 'apply-template-update'/);
+    assert.match(result.stderr, /tembiter-apply-template-update/);
+    assert.match(result.stderr, /tembiter-prepare-template/);
+    assert.equal(existsSync(join(project.repo, ".agents")), false);
+  });
+
+  it("treats unprefixed prepare-template as unknown", () => {
+    const root = tempDir();
+    const template = createRepo(root, "template", "template");
+
+    const result = runCli(
+      ["skill", "install", "--skill", "prepare-template", "--path", template.repo],
+      template.env,
+    );
+
+    assert.notEqual(result.status, 0);
+    assert.notEqual(result.status, null);
+    assert.match(result.stderr, /Unknown skill 'prepare-template'/);
+    assert.match(result.stderr, /tembiter-apply-template-update/);
+    assert.match(result.stderr, /tembiter-prepare-template/);
+    assert.equal(existsSync(join(template.repo, ".agents")), false);
   });
 
   it("fails when --path is not a git repository", () => {
@@ -275,7 +333,7 @@ describe("tembiter skill install", () => {
     writeConfig(dir, projectConfig("/path/to/template", "v1.0.0"));
 
     const result = runCli(
-      ["skill", "install", "--skill", "apply-template-update", "--path", dir],
+      ["skill", "install", "--skill", "tembiter-apply-template-update", "--path", dir],
     );
 
     assert.notEqual(result.status, 0);

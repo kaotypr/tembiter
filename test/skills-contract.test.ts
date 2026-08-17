@@ -47,6 +47,15 @@ function packagedSkillBody(id: string): string {
   return readFileSync(join(packageRoot(), "skills", id, "SKILL.md"), "utf8");
 }
 
+function yamlName(body: string): string | undefined {
+  const match = body.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (match === null || match[1] === undefined) {
+    return undefined;
+  }
+  const name = match[1].match(/^name:\s*(.+)$/m);
+  return name?.[1]?.trim();
+}
+
 function collapsed(text: string): string {
   return text.replace(/\s+/g, " ");
 }
@@ -118,16 +127,22 @@ function assertNoUpdateCommand(output: string): void {
   assert.doesNotMatch(output, /^\s*update\b/m);
 }
 
-describe("packaged apply-template-update skill", () => {
+describe("packaged tembiter-apply-template-update skill", () => {
   it("includes the required S4 section headings", () => {
-    const body = packagedSkillBody("apply-template-update");
+    const body = packagedSkillBody("tembiter-apply-template-update");
     for (const heading of APPLY_HEADINGS) {
       assert.match(body, new RegExp(`^${heading}$`, "m"), `missing heading ${heading}`);
     }
   });
 
+  it("YAML name equals the directory id", () => {
+    const body = packagedSkillBody("tembiter-apply-template-update");
+    assert.equal(yamlName(body), "tembiter-apply-template-update");
+    assert.match(body, /^# Apply template update$/m);
+  });
+
   it("tells an agent to read project format, branch, judge sides, refresh, and merge locally", () => {
-    const body = packagedSkillBody("apply-template-update");
+    const body = packagedSkillBody("tembiter-apply-template-update");
     assertIncludes(body, ".tembiter/config.json");
     assertIncludes(body, 'kind: "project"');
     assertIncludes(body, "git available");
@@ -156,7 +171,7 @@ describe("packaged apply-template-update skill", () => {
   });
 
   it("forbids telling the human to run npx tembiter and forbids treating a changelog as done", () => {
-    const body = packagedSkillBody("apply-template-update");
+    const body = packagedSkillBody("tembiter-apply-template-update");
     assertIncludes(body, "Do not tell the human to run `npx tembiter` for this bump");
     assertIncludes(body, "Do not treat a changelog, diff listing, or generated notes as done");
     assert.doesNotMatch(body, /run `npx tembiter update`/);
@@ -164,15 +179,21 @@ describe("packaged apply-template-update skill", () => {
   });
 });
 
-describe("packaged prepare-template skill", () => {
+describe("packaged tembiter-prepare-template skill", () => {
   it("tells a template owner to keep format, tag versions, and not invent a scheme", () => {
-    const body = packagedSkillBody("prepare-template");
+    const body = packagedSkillBody("tembiter-prepare-template");
     assertIncludes(body, 'Keep template-side `.tembiter/config.json` with `kind: "template"`');
     assertIncludes(body, "Create git tags for versions");
     assertIncludes(body, "create a git tag on that old commit so adopt fallback can bind");
     assertIncludes(body, "never invent a tembiter-only version scheme");
     assertIncludes(body, "Do not tell anyone to run `npx tembiter` as the bump workflow");
     assert.doesNotMatch(body, /npx tembiter update/);
+  });
+
+  it("YAML name equals the directory id", () => {
+    const body = packagedSkillBody("tembiter-prepare-template");
+    assert.equal(yamlName(body), "tembiter-prepare-template");
+    assert.match(body, /^# Prepare template$/m);
   });
 });
 
@@ -192,21 +213,21 @@ describe("tembiter help has no update command", () => {
 });
 
 describe("skill install still expands the S4 bodies", () => {
-  it("installs apply-template-update into a temp project and keeps the required headings", () => {
+  it("installs tembiter-apply-template-update into a temp project and keeps the required headings", () => {
     const root = tempDir();
     const project = createRepo(root, "project", "project");
 
     const result = runCli(
-      ["skill", "install", "--skill", "apply-template-update", "--path", project.repo],
+      ["skill", "install", "--skill", "tembiter-apply-template-update", "--path", project.repo],
       project.env,
     );
 
     assert.equal(result.status, 0, result.stderr);
     const installed = readFileSync(
-      join(project.repo, ".agents", "skills", "apply-template-update", "SKILL.md"),
+      join(project.repo, ".agents", "skills", "tembiter-apply-template-update", "SKILL.md"),
       "utf8",
     );
-    assert.equal(installed, packagedSkillBody("apply-template-update"));
+    assert.equal(installed, packagedSkillBody("tembiter-apply-template-update"));
     for (const heading of APPLY_HEADINGS) {
       assert.match(installed, new RegExp(`^${heading}$`, "m"));
     }
@@ -216,7 +237,7 @@ describe("skill install still expands the S4 bodies", () => {
     const root = tempDir();
     const project = createRepo(root, "project", "project");
     const first = runCli(
-      ["skill", "install", "--skill", "apply-template-update", "--path", project.repo],
+      ["skill", "install", "--skill", "tembiter-apply-template-update", "--path", project.repo],
       project.env,
     );
     assert.equal(first.status, 0, first.stderr);
@@ -225,37 +246,37 @@ describe("skill install still expands the S4 bodies", () => {
       project.repo,
       ".agents",
       "skills",
-      "apply-template-update",
+      "tembiter-apply-template-update",
       "SKILL.md",
     );
     writeFileSync(installedPath, "stale stub body\n", "utf8");
 
     const second = runCli(
-      ["skill", "install", "--skill", "apply-template-update", "--path", project.repo],
+      ["skill", "install", "--skill", "tembiter-apply-template-update", "--path", project.repo],
       project.env,
     );
     assert.equal(second.status, 0, second.stderr);
     const refreshed = readFileSync(installedPath, "utf8");
-    assert.equal(refreshed, packagedSkillBody("apply-template-update"));
+    assert.equal(refreshed, packagedSkillBody("tembiter-apply-template-update"));
     assert.match(refreshed, /^## Apply$/m);
     assertIncludes(refreshed, "Do not tell the human to run `npx tembiter` for this bump");
   });
 
-  it("installs prepare-template into a temp template", () => {
+  it("installs tembiter-prepare-template into a temp template", () => {
     const root = tempDir();
     const template = createRepo(root, "template", "template");
 
     const result = runCli(
-      ["skill", "install", "--skill", "prepare-template", "--path", template.repo],
+      ["skill", "install", "--skill", "tembiter-prepare-template", "--path", template.repo],
       template.env,
     );
 
     assert.equal(result.status, 0, result.stderr);
     const installed = readFileSync(
-      join(template.repo, ".agents", "skills", "prepare-template", "SKILL.md"),
+      join(template.repo, ".agents", "skills", "tembiter-prepare-template", "SKILL.md"),
       "utf8",
     );
-    assert.equal(installed, packagedSkillBody("prepare-template"));
+    assert.equal(installed, packagedSkillBody("tembiter-prepare-template"));
     assertIncludes(installed, "never invent a tembiter-only version scheme");
   });
 });
@@ -270,5 +291,7 @@ describe("README documents agent updates, not a human update command", () => {
     assert.doesNotMatch(readme, /full agent update procedure is filled in later/);
     assert.doesNotMatch(readme, /npx tembiter update/);
     assert.doesNotMatch(readme, /tembiter update\b/);
+    assert.doesNotMatch(readme, /--skill apply-template-update/);
+    assert.doesNotMatch(readme, /--skill prepare-template/);
   });
 });
