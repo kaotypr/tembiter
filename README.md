@@ -2,15 +2,20 @@
 
 Tembiter is an arbiter: its own files, formats, and conventions; a setup CLI (`npx tembiter`); and skills. The CLI writes that format onto a template and a project. An AI agent using the skills and those files brings later template updates into the project.
 
-## Local run
+```sh
+npx tembiter
+npx tembiter --help
+npx tembiter --version
+```
+
+## Local development
 
 Requires Node.js 20 or later and git.
 
 ```sh
 npm install
 npm run build
-npx --package . tembiter --help
-npx --package . tembiter --version
+npx --package . tembiter
 ```
 
 ### Interactive setup
@@ -31,7 +36,7 @@ npx tembiter --non-interactive init \
 ### Start a new project
 
 ```sh
-npx --package . tembiter init \
+npx tembiter init \
   --template /path/to/template \
   --target /path/to/new-project \
   --tag v1.0.0
@@ -49,7 +54,7 @@ npx --package . tembiter init \
 ### Register a template
 
 ```sh
-npx --package . tembiter template register --path /path/to/template
+npx tembiter template register --path /path/to/template
 ```
 
 | Flag | Required | Meaning |
@@ -64,7 +69,7 @@ npx --package . tembiter template register --path /path/to/template
 Use `adopt` when the project already exists. If the template already has version tags, pass `--tag`. It writes `.tembiter/config.json` and creates one new commit of `.tembiter/` only. It does not copy template files and does not rewrite project history.
 
 ```sh
-npx --package . tembiter adopt \
+npx tembiter adopt \
   --template /path/to/template \
   --tag v1.0.0 \
   --project /path/to/existing-project
@@ -86,7 +91,7 @@ If the template has no tags, omit `--tag`. adopt prints the project's first-comm
 Skills ship in this package. They are not scraped from a template. Install them with `tembiter skill install` onto a template or a connected project.
 
 ```sh
-npx --package . tembiter skill install \
+npx tembiter skill install \
   --skill apply-template-update \
   --path /path/to/project
 ```
