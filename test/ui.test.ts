@@ -15,8 +15,11 @@ import { fileURLToPath } from "node:url";
 import { main, type MainOptions } from "../src/cli.js";
 import { readConfig, templateConfig, writeConfig } from "../src/format/config.js";
 import { gitText, runGit } from "../src/git.js";
-import { formatPickerMenu, pickerLabels } from "../src/ui/picker.js";
-import type { PromptIo } from "../src/ui/prompt.js";
+import { TITLE, formatBanner, printBanner } from "../src/ui/banner.js";
+import { bold, cyan, dim, inverse, magenta } from "../src/ui/color.js";
+import { formatPickerMenu, pickerLabels, pickerSelectChoices } from "../src/ui/picker.js";
+import { PromptCancelled, type PromptIo } from "../src/ui/prompt.js";
+import { selectChoice } from "../src/ui/select.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cliPath = join(here, "..", "src", "cli.js");
@@ -118,7 +121,10 @@ function createSkillRepo(
   return { repo, env };
 }
 
-function scriptedPrompt(answers: string[]): PromptIo & { questions: string[]; writes: string[] } {
+function scriptedPrompt(
+  answers: string[],
+  selectValue?: string[],
+): PromptIo & { questions: string[]; writes: string[] } {
   const remaining = [...answers];
   const questions: string[] = [];
   const writes: string[] = [];
@@ -136,6 +142,12 @@ function scriptedPrompt(answers: string[]): PromptIo & { questions: string[]; wr
       }
       return Promise.resolve(next);
     },
+    select<T = string[]>() {
+      if (selectValue === undefined) {
+        return Promise.reject(new Error("select should not be called"));
+      }
+      return Promise.resolve(selectValue as T);
+    },
     close() {},
   };
 }
@@ -148,8 +160,77 @@ function throwingPrompt(): PromptIo {
     question() {
       return Promise.reject(new Error("prompt should not be called"));
     },
+    select() {
+      return Promise.reject(new Error("select should not be called"));
+    },
     close() {},
   };
+}
+
+function cancellingSelectPrompt(): PromptIo {
+  return {
+    write() {},
+    question() {
+      return Promise.reject(new Error("question should not be called"));
+    },
+    select() {
+      return Promise.reject(new PromptCancelled());
+    },
+    close() {},
+  };
+}
+
+function fakeRawStdin(): NodeJS.ReadStream & { emitData: (chunk: string) => void } {
+  const listeners = new Map<string, Set<(chunk: string) => void>>();
+  const stdin = {
+    isTTY: true,
+    isRaw: false,
+    setRawMode(mode: boolean) {
+      stdin.isRaw = mode;
+      return stdin;
+    },
+    resume() {
+      return stdin;
+    },
+    pause() {
+      return stdin;
+    },
+    setEncoding() {
+      return stdin;
+    },
+    on(event: string, fn: (chunk: string) => void) {
+      const set = listeners.get(event) ?? new Set();
+      set.add(fn);
+      listeners.set(event, set);
+      return stdin;
+    },
+    off(event: string, fn: (chunk: string) => void) {
+      listeners.get(event)?.delete(fn);
+      return stdin;
+    },
+    emitData(chunk: string) {
+      for (const fn of listeners.get("data") ?? []) {
+        fn(chunk);
+      }
+    },
+  };
+  return stdin as unknown as NodeJS.ReadStream & { emitData: (chunk: string) => void };
+}
+
+function withTimeout<T>(promise: Promise<T>, ms = 1000): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("select timed out")), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err: unknown) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
 }
 
 function ttyStreams(): Pick<MainOptions, "stdin" | "stdout"> {
@@ -213,6 +294,45 @@ function spawnCli(args: string[]): {
 }
 
 describe("interactive setup UI", () => {
+  it("TITLE is Tembiter and the banner includes the hinge, not TEMBITER", () => {
+    assert.equal(TITLE, "Tembiter");
+    const banner = formatBanner({ env: { NO_COLOR: "1" }, stream: { isTTY: true } });
+    assert.match(banner, /template/);
+    assert.match(banner, /project/);
+    assert.match(banner, /◆/);
+    assert.match(banner, /Arbiter for template format, setup CLI, and skills/);
+    assert.doesNotMatch(banner, /TEMBITER/);
+    for (const line of banner.split("\n")) {
+      assert.ok(line.length <= 80, JSON.stringify(line));
+    }
+
+    const printed: string[] = [];
+    printBanner(
+      {
+        isTTY: false,
+        write(chunk: string) {
+          printed.push(chunk);
+          return true;
+        },
+      } as unknown as NodeJS.WritableStream & { isTTY?: boolean },
+      { NO_COLOR: "1" },
+    );
+    const out = printed.join("");
+    assert.match(out, /template/);
+    assert.match(out, /project/);
+    assert.match(out, /◆/);
+    assert.doesNotMatch(out, /TEMBITER/);
+  });
+
+  it("color helper returns plain text when NO_COLOR is set", () => {
+    const ctx = { env: { NO_COLOR: "1" }, stream: { isTTY: true } };
+    assert.equal(cyan("hello", ctx), "hello");
+    assert.equal(magenta("◆", ctx), "◆");
+    assert.equal(dim("template", ctx), "template");
+    assert.equal(bold("T", ctx), "T");
+    assert.equal(inverse("init", ctx), "init");
+  });
+
   it("picker lists only the four setup commands and never lists update", () => {
     const labels = pickerLabels();
     assert.deepEqual(labels, ["init", "template register", "adopt", "skill install"]);
@@ -223,13 +343,17 @@ describe("interactive setup UI", () => {
     assert.match(menu, /adopt/);
     assert.match(menu, /skill install/);
     assert.doesNotMatch(menu, /update/);
+    assert.deepEqual(
+      pickerSelectChoices().map((choice) => choice.value),
+      [["init"], ["template", "register"], ["adopt"], ["skill", "install"]],
+    );
   });
 
   it("fake picker answers for init produce the same git and format effects as flags", async () => {
     const root = tempDir();
     const fixture = createTemplateFixture(root);
     const target = join(root, "project");
-    const prompt = scriptedPrompt(["1", fixture.repo, target, fixture.tag, ""]);
+    const prompt = scriptedPrompt([fixture.repo, target, fixture.tag, ""], ["init"]);
 
     const result = await runMain([], {
       ...ttyStreams(),
@@ -239,14 +363,15 @@ describe("interactive setup UI", () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(prompt.questions, [
-      "Command: ",
       "--template: ",
       "--target: ",
       "--tag: ",
       "--message: ",
     ]);
-    assert.match(prompt.writes.join(""), /init/);
-    assert.doesNotMatch(prompt.writes.join(""), /update/);
+    assert.match(result.stdout, /template/);
+    assert.match(result.stdout, /project/);
+    assert.match(result.stdout, /◆/);
+    assert.doesNotMatch(result.stdout, /TEMBITER/);
     assert.equal(gitText(["rev-list", "--count", "HEAD"], { cwd: target, env: fixture.env }), "1");
     assert.equal(
       gitText(["log", "-1", "--format=%s"], { cwd: target, env: fixture.env }),
@@ -280,6 +405,8 @@ describe("interactive setup UI", () => {
       "--tag: ",
       "--message: ",
     ]);
+    assert.doesNotMatch(result.stdout, /◆/);
+    assert.doesNotMatch(prompt.writes.join(""), /◆/);
     assert.equal(
       gitText(["log", "-1", "--format=%s"], { cwd: target, env: fixture.env }),
       "Custom start",
@@ -315,7 +442,7 @@ describe("interactive setup UI", () => {
     runGit(["add", "known.txt"], { cwd: repo, env: fixture.env });
     runGit(["commit", "-m", "existing history"], { cwd: repo, env: fixture.env });
     const parent = gitText(["rev-parse", "HEAD"], { cwd: repo, env: fixture.env });
-    const prompt = scriptedPrompt(["2", repo, ""]);
+    const prompt = scriptedPrompt([repo, ""], ["template", "register"]);
 
     const result = await runMain([], {
       ...ttyStreams(),
@@ -324,7 +451,7 @@ describe("interactive setup UI", () => {
     });
 
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(prompt.questions, ["Command: ", "--path: ", "--message: "]);
+    assert.deepEqual(prompt.questions, ["--path: ", "--message: "]);
     const config = readConfig(repo);
     assert.equal(config.kind, "template");
     assert.equal(gitText(["rev-list", "--count", "HEAD"], { cwd: repo, env: fixture.env }), "2");
@@ -394,6 +521,41 @@ describe("interactive setup UI", () => {
     assert.equal(gitText(["rev-list", "--count", "HEAD"], { cwd: project, env }), countBefore);
   });
 
+  it("fake picker select for adopt produces the same git and format effects as flags", async () => {
+    const root = tempDir();
+    const template = createTemplateFixture(root);
+    const project = createProjectRepo(root, template.env, "from-picker");
+    const parentBefore = gitText(["rev-parse", "HEAD"], {
+      cwd: project,
+      env: template.env,
+    });
+    const prompt = scriptedPrompt([template.repo, template.tag, project, ""], ["adopt"]);
+
+    const result = await runMain([], {
+      ...ttyStreams(),
+      prompt,
+      env: template.env,
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(prompt.questions, [
+      "--template: ",
+      "--tag: ",
+      "--project: ",
+      "--message: ",
+    ]);
+    assert.equal(
+      gitText(["rev-parse", "HEAD^"], { cwd: project, env: template.env }),
+      parentBefore,
+    );
+    const config = readConfig(project);
+    assert.equal(config.kind, "project");
+    if (config.kind === "project") {
+      assert.equal(config.template.identity, template.repo);
+      assert.equal(config.template.version, template.tag);
+    }
+  });
+
   it("fake prompt answers for skill install match the flags path", async () => {
     const root = tempDir();
     const project = createSkillRepo(root, "project", "project");
@@ -416,6 +578,25 @@ describe("interactive setup UI", () => {
     );
     assert.equal(existsSync(installed), true);
     assert.match(readFileSync(installed, "utf8"), /Apply template update/);
+  });
+
+  it("fake picker select for skill install produces the same install as flags", async () => {
+    const root = tempDir();
+    const project = createSkillRepo(root, "picker-project", "project");
+    const prompt = scriptedPrompt(["apply-template-update", project.repo], ["skill", "install"]);
+
+    const result = await runMain([], {
+      ...ttyStreams(),
+      prompt,
+      env: project.env,
+    });
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(prompt.questions, ["--skill: ", "--path: "]);
+    assert.equal(
+      existsSync(join(project.repo, ".agents", "skills", "apply-template-update", "SKILL.md")),
+      true,
+    );
   });
 
   it("--non-interactive missing flags stay a usage error even when streams look like a TTY", async () => {
@@ -447,13 +628,97 @@ describe("interactive setup UI", () => {
 
   it("picker cancel exits non-zero without writing files", async () => {
     const root = tempDir();
-    const prompt = scriptedPrompt([""]);
+    const prompt = cancellingSelectPrompt();
     const result = await runMain([], {
       ...ttyStreams(),
       prompt,
     });
     assert.equal(result.status, 1);
     assert.equal(existsSync(join(root, ".tembiter")), false);
+  });
+
+  it("--non-interactive no-args prints usage and does not prompt", async () => {
+    const result = await runMain(["--non-interactive"], {
+      ...ttyStreams(),
+      prompt: throwingPrompt(),
+    });
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /Usage:/);
+    assert.doesNotMatch(result.stdout, /◆/);
+  });
+
+  it("falls back to the numbered prompt when raw mode is unavailable", async () => {
+    const questions: string[] = [];
+    const writes: string[] = [];
+    const value = await selectChoice(pickerSelectChoices(), {
+      stdin: { isTTY: false } as unknown as NodeJS.ReadableStream,
+      stdout: {
+        write(chunk: string) {
+          writes.push(chunk);
+          return true;
+        },
+      } as unknown as NodeJS.WritableStream,
+      question: (query) => {
+        questions.push(query);
+        return Promise.resolve("4");
+      },
+    });
+    assert.deepEqual(value, ["skill", "install"]);
+    assert.deepEqual(questions, ["Command: "]);
+    assert.match(writes.join(""), /1\) init/);
+    assert.doesNotMatch(writes.join(""), /update/);
+  });
+
+  it("raw-mode select moves with arrows and confirms Enter without a real TTY", async () => {
+    const stdin = fakeRawStdin();
+    const pending = selectChoice(pickerSelectChoices(), {
+      stdin,
+      stdout: {
+        isTTY: true,
+        write() {
+          return true;
+        },
+      } as unknown as NodeJS.WritableStream & { isTTY?: boolean },
+    });
+    queueMicrotask(() => {
+      stdin.emitData("\x1b[B");
+      stdin.emitData("\r");
+    });
+    assert.deepEqual(await withTimeout(pending), ["template", "register"]);
+  });
+
+  it("raw-mode select treats digit 1-4 as an immediate choice", async () => {
+    const stdin = fakeRawStdin();
+    const pending = selectChoice(pickerSelectChoices(), {
+      stdin,
+      stdout: {
+        isTTY: true,
+        write() {
+          return true;
+        },
+      } as unknown as NodeJS.WritableStream & { isTTY?: boolean },
+    });
+    queueMicrotask(() => {
+      stdin.emitData("3");
+    });
+    assert.deepEqual(await withTimeout(pending), ["adopt"]);
+  });
+
+  it("raw-mode Ctrl-C cancels without hanging", async () => {
+    const stdin = fakeRawStdin();
+    const pending = selectChoice(pickerSelectChoices(), {
+      stdin,
+      stdout: {
+        isTTY: true,
+        write() {
+          return true;
+        },
+      } as unknown as NodeJS.WritableStream & { isTTY?: boolean },
+    });
+    queueMicrotask(() => {
+      stdin.emitData("\x03");
+    });
+    await assert.rejects(withTimeout(pending), (err: unknown) => err instanceof PromptCancelled);
   });
 
   it("--help and --version stay non-prompting on a TTY", async () => {
