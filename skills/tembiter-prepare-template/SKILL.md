@@ -1,3 +1,8 @@
+---
+name: tembiter-prepare-template
+description: Keep a template recognizable to tembiter and tag versions.
+---
+
 # Prepare template
 
 Purpose: template
@@ -5,7 +10,7 @@ Purpose: template
 Keep a template repository recognizable to tembiter and tag versions so
 projects can connect and later bump. You are helping a **template owner**.
 Later bumps on connected projects are an AI-agent workflow using
-`apply-template-update`; they are not a human CLI update.
+`tembiter-apply-template-update`; they are not a human CLI update.
 
 ## Template-side format
 
@@ -15,7 +20,7 @@ change `kind` to `"project"`, and do not scatter new format files outside
 `.tembiter/`.
 
 This repository is a template, not a connected project. Do not run
-`apply-template-update` here.
+`tembiter-apply-template-update` here.
 
 ## Git tags are versions
 
@@ -35,7 +40,7 @@ does not create tags for you.
 - Do not tell anyone to run `npx tembiter` as the bump workflow for a
   connected project. The setup CLI marks the template, initializes or
   adopts a project, and installs skills. An agent using
-  `apply-template-update` owns later bumps.
+  `tembiter-apply-template-update` owns later bumps.
 - Do not add a `location` field to the format in this workflow.
 - Do not require GitHub or GitLab. Tags are local git objects; push them
   to a remote if the owner already uses one.
