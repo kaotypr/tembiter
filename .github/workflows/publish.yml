@@ -1,0 +1,26 @@
+name: Publish Package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm test
+      - id: dist-tag
+        run: echo "tag=$(node dist/scripts/npm-dist-tag.js)" >> "$GITHUB_OUTPUT"
+      - run: npm publish --tag "${{ steps.dist-tag.outputs.tag }}"
