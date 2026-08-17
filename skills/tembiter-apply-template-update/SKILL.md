@@ -1,3 +1,8 @@
+---
+name: tembiter-apply-template-update
+description: Bring a later template git tag into a connected project.
+---
+
 # Apply template update
 
 Purpose: project

@@ -36,7 +36,7 @@ export function printSkillInstallUsage(stream: NodeJS.WritableStream): void {
   stream.write("Install a packaged skill into a template or project repository.\n");
   stream.write("\n");
   stream.write("Flags:\n");
-  stream.write("  --skill  Catalog id (apply-template-update or prepare-template)\n");
+  stream.write(`  --skill  Catalog id (${knownSkillSummary()})\n`);
   stream.write("  --path   Template or project repository root\n");
 }
 
@@ -153,7 +153,7 @@ function assertPurposeMatches(target: string, entry: CatalogEntry): void {
   } catch (err) {
     if (err instanceof ConfigError) {
       throw new CliError(
-        `Could not read .tembiter/config.json at ${target}: ${err.message} Install apply-template-update onto a project, or prepare-template onto a template.`,
+        `Could not read .tembiter/config.json at ${target}: ${err.message} Known skills: ${knownSkillSummary()}.`,
       );
     }
     throw err;
@@ -161,7 +161,7 @@ function assertPurposeMatches(target: string, entry: CatalogEntry): void {
 
   if (kind !== entry.purpose) {
     throw new CliError(
-      `Skill '${entry.id}' is for a ${entry.purpose} repository, but ${target} is a ${kind}. Install apply-template-update onto a project, or prepare-template onto a template.`,
+      `Skill '${entry.id}' is for a ${entry.purpose} repository, but ${target} is a ${kind}. Known skills: ${knownSkillSummary()}.`,
     );
   }
 }

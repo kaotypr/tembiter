@@ -559,7 +559,7 @@ describe("interactive setup UI", () => {
   it("fake prompt answers for skill install match the flags path", async () => {
     const root = tempDir();
     const project = createSkillRepo(root, "project", "project");
-    const prompt = scriptedPrompt(["apply-template-update", project.repo]);
+    const prompt = scriptedPrompt(["tembiter-apply-template-update", project.repo]);
 
     const result = await runMain(["skill", "install"], {
       ...ttyStreams(),
@@ -573,7 +573,7 @@ describe("interactive setup UI", () => {
       project.repo,
       ".agents",
       "skills",
-      "apply-template-update",
+      "tembiter-apply-template-update",
       "SKILL.md",
     );
     assert.equal(existsSync(installed), true);
@@ -583,7 +583,7 @@ describe("interactive setup UI", () => {
   it("fake picker select for skill install produces the same install as flags", async () => {
     const root = tempDir();
     const project = createSkillRepo(root, "picker-project", "project");
-    const prompt = scriptedPrompt(["apply-template-update", project.repo], ["skill", "install"]);
+    const prompt = scriptedPrompt(["tembiter-apply-template-update", project.repo], ["skill", "install"]);
 
     const result = await runMain([], {
       ...ttyStreams(),
@@ -594,7 +594,7 @@ describe("interactive setup UI", () => {
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(prompt.questions, ["--skill: ", "--path: "]);
     assert.equal(
-      existsSync(join(project.repo, ".agents", "skills", "apply-template-update", "SKILL.md")),
+      existsSync(join(project.repo, ".agents", "skills", "tembiter-apply-template-update", "SKILL.md")),
       true,
     );
   });

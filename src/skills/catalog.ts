@@ -10,8 +10,8 @@ export type CatalogEntry = {
 };
 
 export const CATALOG: readonly CatalogEntry[] = [
-  { id: "apply-template-update", purpose: "project" },
-  { id: "prepare-template", purpose: "template" },
+  { id: "tembiter-apply-template-update", purpose: "project" },
+  { id: "tembiter-prepare-template", purpose: "template" },
 ];
 
 export function getCatalogEntry(id: string): CatalogEntry | undefined {
