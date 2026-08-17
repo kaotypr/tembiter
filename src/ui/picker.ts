@@ -1,4 +1,4 @@
-import { PromptCancelled, type PromptIo } from "./prompt.js";
+import { PromptCancelled, type PromptIo, type SelectChoice } from "./prompt.js";
 
 export type PickerChoice = {
   key: string;
@@ -30,19 +30,20 @@ export function pickerLabels(
   return commands.map((command) => command.label);
 }
 
-export async function pickSetupCommand(io: PromptIo): Promise<string[]> {
-  io.write(formatPickerMenu());
-  const answer = (await io.question("Command: ")).trim();
-  if (answer.length === 0) {
-    throw new PromptCancelled();
-  }
+export function pickerSelectChoices(
+  commands: readonly PickerChoice[] = PICKER_COMMANDS,
+): SelectChoice<string[]>[] {
+  return commands.map((command) => ({
+    key: command.key,
+    label: command.label,
+    value: [...command.argv],
+  }));
+}
 
-  const match = PICKER_COMMANDS.find(
-    (command) => command.key === answer || command.label === answer,
-  );
-  if (match === undefined) {
-    io.write(`Unknown choice '${answer}'. Enter 1-4 or a setup command name.\n`);
+export async function pickSetupCommand(io: PromptIo): Promise<string[]> {
+  const selected = await io.select(pickerSelectChoices());
+  if (selected.length === 0) {
     throw new PromptCancelled();
   }
-  return [...match.argv];
+  return selected;
 }
