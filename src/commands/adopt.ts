@@ -10,13 +10,8 @@ import {
   writeConfig,
   type TembiterConfig,
 } from "../format/config.js";
-import {
-  GitError,
-  gitConfigGet,
-  gitText,
-  isGitUrl,
-  runGit,
-} from "../git.js";
+import { GitError, gitConfigGet, gitText, isGitUrl, runGit } from "../git.js";
+import { createProgressReporter, type ProgressReporter } from "../ui/progress.js";
 import { CliError } from "./init.js";
 
 export function defaultAdoptMessage(identity: string, tag: string): string {
@@ -339,6 +334,7 @@ function printNoTagsAssistance(
 function withTemplateRepo(
   template: string,
   env: NodeJS.ProcessEnv,
+  progress: ProgressReporter,
   fn: (repoPath: string) => void,
 ): void {
   if (!isGitUrl(template)) {
@@ -364,6 +360,7 @@ function withTemplateRepo(
     return;
   }
 
+  progress.step("Cloning template…");
   const cloneDir = mkdtempSync(join(tmpdir(), "tembiter-adopt-template-"));
   try {
     try {
@@ -464,6 +461,7 @@ export function adoptFromFlags(
   env: NodeJS.ProcessEnv = process.env,
   cwd: string = process.cwd(),
   stdout: NodeJS.WritableStream = process.stdout,
+  progress: ProgressReporter = createProgressReporter(process.stdout),
 ): void {
   if (flags.template === undefined || flags.template.length === 0) {
     throw new CliError("Missing required flags: --template.", {
@@ -478,7 +476,7 @@ export function adoptFromFlags(
     : cwd;
   const projectRoot = resolveProjectRoot(projectArg, env);
 
-  withTemplateRepo(template, env, (repoPath) => {
+  withTemplateRepo(template, env, progress, (repoPath) => {
     let tags: string[];
     try {
       tags = listTags(repoPath);
@@ -507,26 +505,40 @@ export function adoptFromFlags(
   const resolvedTag = tag as string;
   const matched = assertCompatibleConfig(projectRoot, template, resolvedTag);
   if (!matched) {
+    progress.step("Writing .tembiter/…");
     writeConfig(projectRoot, projectConfig(template, resolvedTag));
   }
 
   if (tembiterIsDirty(projectRoot, env)) {
     const message = flags.message ?? defaultAdoptMessage(template, resolvedTag);
+    progress.step("Creating commit…");
     commitTembiter(projectRoot, message, env);
   }
+  progress.done(`Connected ${projectRoot} to ${template}@${resolvedTag}.`);
 }
 
 export function runAdopt(
   args: string[],
-  options: { env?: NodeJS.ProcessEnv; cwd?: string } = {},
+  options: {
+    env?: NodeJS.ProcessEnv;
+    cwd?: string;
+    progress?: ProgressReporter;
+  } = {},
 ): number {
+  const progress = options.progress ?? createProgressReporter(process.stdout);
   try {
     const flags = parseAdoptFlags(args);
     if (flags.help) {
       printAdoptUsage(process.stdout);
       return 0;
     }
-    adoptFromFlags(flags, options.env ?? process.env, options.cwd ?? process.cwd());
+    adoptFromFlags(
+      flags,
+      options.env ?? process.env,
+      options.cwd ?? process.cwd(),
+      process.stdout,
+      progress,
+    );
     return 0;
   } catch (err) {
     if (err instanceof CliError) {
@@ -534,14 +546,17 @@ export function runAdopt(
       if (err.showUsage) {
         printAdoptUsage(process.stderr);
       }
+      progress.fail();
       return err.exitCode;
     }
     if (err instanceof GitError) {
       process.stderr.write(`${err.message}\n`);
+      progress.fail();
       return 1;
     }
     if (err instanceof ConfigError) {
       process.stderr.write(`${err.message}\n`);
+      progress.fail();
       return 1;
     }
     throw err;

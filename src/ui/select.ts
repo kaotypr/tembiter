@@ -1,9 +1,10 @@
-import { inverse, type TtyStream } from "./color.js";
+import { dim, inverse, type TtyStream } from "./color.js";
 import { PromptCancelled } from "./prompt.js";
 
 export type SelectChoice<T = string[]> = {
   key?: string;
   label: string;
+  description?: string;
   value: T;
 };
 
@@ -23,21 +24,29 @@ export function canUseRawMode(stdin: NodeJS.ReadableStream): stdin is NodeJS.Rea
   return stream.isTTY === true && typeof stream.setRawMode === "function";
 }
 
-function formatChoiceRow(
+function formatChoiceRows(
   choice: SelectChoice<unknown>,
   highlighted: boolean,
   stdout: TtyStream,
-): string {
+): string[] {
   const prefix = highlighted ? ">" : " ";
   const label = highlighted ? inverse(choice.label, { stream: stdout }) : choice.label;
-  return `${prefix} ${label}`;
+  const rows = [`${prefix} ${label}`];
+  if (choice.description !== undefined && choice.description.length > 0) {
+    rows.push(`    ${dim(choice.description, { stream: stdout })}`);
+  }
+  return rows;
 }
 
-function listLines(choices: readonly SelectChoice<unknown>[], index: number, stdout: TtyStream): string[] {
+function listLines(
+  choices: readonly SelectChoice<unknown>[],
+  index: number,
+  stdout: TtyStream,
+): string[] {
   return [
     "Select a setup command:",
     "",
-    ...choices.map((choice, i) => formatChoiceRow(choice, i === index, stdout)),
+    ...choices.flatMap((choice, i) => formatChoiceRows(choice, i === index, stdout)),
   ];
 }
 
@@ -89,13 +98,16 @@ function choiceByDigit<T>(
 
 async function selectNumbered<T>(
   choices: readonly SelectChoice<T>[],
-  stdout: NodeJS.WritableStream,
+  stdout: NodeJS.WritableStream & TtyStream,
   question: (query: string) => Promise<string>,
 ): Promise<T> {
   const lines = ["Select a setup command:", ""];
   for (const [i, choice] of choices.entries()) {
     const key = choice.key ?? String(i + 1);
     lines.push(`  ${key}) ${choice.label}`);
+    if (choice.description !== undefined && choice.description.length > 0) {
+      lines.push(`      ${dim(choice.description, { stream: stdout })}`);
+    }
   }
   lines.push("");
   stdout.write(`${lines.join("\n")}\n`);
