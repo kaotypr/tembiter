@@ -10,6 +10,7 @@ import {
   templateConfig,
   writeConfig,
 } from "../format/config.js";
+import { ensureSyncGitignore, GITIGNORE_FILE } from "../format/gitignore.js";
 import { GitError, gitConfigGet, runGit } from "../git.js";
 import { createProgressReporter, type ProgressReporter } from "../ui/progress.js";
 
@@ -148,14 +149,20 @@ function pathInIndex(
   return result.status === 0;
 }
 
+function commitPaths(gitignoreChanged: boolean): string[] {
+  return gitignoreChanged ? [CONFIG_DIR, GITIGNORE_FILE] : [CONFIG_DIR];
+}
+
 function commitTembiter(
   cwd: string,
   message: string,
   env: NodeJS.ProcessEnv,
+  gitignoreChanged: boolean,
 ): void {
   requireGitIdentity(cwd, env);
-  runGit(["add", "--", CONFIG_DIR], { cwd, env });
-  const cached = runGit(["diff", "--cached", "--quiet", "--", CONFIG_DIR], {
+  const paths = commitPaths(gitignoreChanged);
+  runGit(["add", "--", ...paths], { cwd, env });
+  const cached = runGit(["diff", "--cached", "--quiet", "--", ...paths], {
     cwd,
     env,
     allowFailure: true,
@@ -163,7 +170,7 @@ function commitTembiter(
   if (cached.status === 0) {
     return;
   }
-  runGit(["commit", "-m", message, "--", CONFIG_DIR], { cwd, env });
+  runGit(["commit", "-m", message, "--", ...paths], { cwd, env });
 }
 
 function existingTemplateConfig(repoRoot: string): "template" | "project" | "none" {
@@ -209,7 +216,8 @@ export function registerFromFlags(
       return;
     }
     progress.step("Creating commit…");
-    commitTembiter(repoRoot, message, env);
+    const gitignoreChanged = ensureSyncGitignore(repoRoot);
+    commitTembiter(repoRoot, message, env, gitignoreChanged);
     progress.done(`Registered template at ${repoRoot}.`);
     return;
   }
@@ -217,7 +225,8 @@ export function registerFromFlags(
   progress.step("Writing .tembiter/…");
   writeConfig(repoRoot, templateConfig());
   progress.step("Creating commit…");
-  commitTembiter(repoRoot, message, env);
+  const gitignoreChanged = ensureSyncGitignore(repoRoot);
+  commitTembiter(repoRoot, message, env, gitignoreChanged);
   progress.done(`Registered template at ${repoRoot}.`);
 }
 

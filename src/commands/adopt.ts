@@ -10,6 +10,7 @@ import {
   writeConfig,
   type TembiterConfig,
 } from "../format/config.js";
+import { ensureSyncGitignore, GITIGNORE_FILE } from "../format/gitignore.js";
 import { GitError, gitConfigGet, gitText, isGitUrl, runGit } from "../git.js";
 import { createProgressReporter, type ProgressReporter } from "../ui/progress.js";
 import { CliError } from "./init.js";
@@ -413,10 +414,12 @@ function commitTembiter(
   projectRoot: string,
   message: string,
   env: NodeJS.ProcessEnv,
+  gitignoreChanged: boolean,
 ): void {
   requireGitIdentity(projectRoot, env);
-  runGit(["add", "--", CONFIG_DIR], { cwd: projectRoot, env });
-  runGit(["commit", "--only", "-m", message, "--", CONFIG_DIR], {
+  const paths = gitignoreChanged ? [CONFIG_DIR, GITIGNORE_FILE] : [CONFIG_DIR];
+  runGit(["add", "--", ...paths], { cwd: projectRoot, env });
+  runGit(["commit", "--only", "-m", message, "--", ...paths], {
     cwd: projectRoot,
     env,
   });
@@ -512,7 +515,8 @@ export function adoptFromFlags(
   if (tembiterIsDirty(projectRoot, env)) {
     const message = flags.message ?? defaultAdoptMessage(template, resolvedTag);
     progress.step("Creating commit…");
-    commitTembiter(projectRoot, message, env);
+    const gitignoreChanged = ensureSyncGitignore(projectRoot);
+    commitTembiter(projectRoot, message, env, gitignoreChanged);
   }
   progress.done(`Connected ${projectRoot} to ${template}@${resolvedTag}.`);
 }
