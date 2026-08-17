@@ -27,6 +27,7 @@ import {
   runSkillInstall,
   type SkillInstallFlags,
 } from "./commands/skill-install.js";
+import { knownSkillSummary } from "./skills/catalog.js";
 import { printBanner } from "./ui/banner.js";
 import { pickSetupCommand } from "./ui/picker.js";
 import {
@@ -140,8 +141,7 @@ const ADOPT_FIELDS = {
 const SKILL_INSTALL_FIELDS = {
   skill: {
     title: "Skill id",
-    description:
-      "Catalog id (tembiter-apply-template-update, tembiter-prepare-template)",
+    description: `Catalog id (${knownSkillSummary()})`,
     required: true,
   },
   path: {
