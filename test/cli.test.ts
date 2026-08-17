@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-const cliPath = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "cli.js");
+const here = dirname(fileURLToPath(import.meta.url));
+const cliPath = join(here, "..", "src", "cli.js");
+const packageJson = JSON.parse(
+  readFileSync(join(here, "..", "..", "package.json"), "utf8"),
+) as { version: string };
 
 function runCli(args: string[]): {
   status: number | null;
@@ -37,6 +42,7 @@ describe("tembiter CLI", () => {
     const result = runCli(["--help"]);
     assert.equal(result.status, 0);
     assert.match(result.stdout, /tembiter/);
+    assert.ok(result.stdout.includes(packageJson.version));
     assert.match(result.stdout, /init/);
     assert.match(result.stdout, /template register/);
     assert.match(result.stdout, /adopt/);
@@ -76,10 +82,10 @@ describe("tembiter CLI", () => {
     assert.match(result.stdout, /--path/);
   });
 
-  it("--version prints 0.0.1-alpha.2", () => {
+  it("--version prints the package.json version", () => {
     const result = runCli(["--version"]);
     assert.equal(result.status, 0);
-    assert.match(result.stdout.trim(), /^0\.0\.1-alpha\.2$/);
+    assert.equal(result.stdout.trim(), packageJson.version);
   });
 
   it("an unknown subcommand exits non-zero", () => {
