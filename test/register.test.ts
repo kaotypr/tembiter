@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -133,7 +134,14 @@ describe("tembiter template register", () => {
       gitText(["log", "-1", "--format=%s"], { cwd: fixture.repo, env: fixture.env }),
       "Register tembiter template",
     );
-    assert.deepEqual(committedPaths(fixture.repo, fixture.env), [".tembiter/config.json"]);
+    assert.deepEqual(committedPaths(fixture.repo, fixture.env).sort(), [
+      ".gitignore",
+      ".tembiter/config.json",
+    ]);
+    assert.match(
+      gitText(["show", "HEAD:.gitignore"], { cwd: fixture.repo, env: fixture.env }),
+      /^\.tembiter\/sync\/$/m,
+    );
 
     const dirty = gitText(["status", "--porcelain", "--", "dirty.txt"], {
       cwd: fixture.repo,
@@ -200,7 +208,36 @@ describe("tembiter template register", () => {
       gitText(["rev-parse", "HEAD^"], { cwd: fixture.repo, env: fixture.env }),
       fixture.parent,
     );
-    assert.deepEqual(committedPaths(fixture.repo, fixture.env), [".tembiter/config.json"]);
+    assert.deepEqual(committedPaths(fixture.repo, fixture.env).sort(), [
+      ".gitignore",
+      ".tembiter/config.json",
+    ]);
+  });
+
+  it("does not write gitignore on a true no-op already-registered template", () => {
+    const root = tempDir();
+    const fixture = createRepoFixture(root);
+    writeConfig(fixture.repo, templateConfig());
+    runGit(["add", ".tembiter"], { cwd: fixture.repo, env: fixture.env });
+    runGit(["commit", "-m", "already registered"], { cwd: fixture.repo, env: fixture.env });
+    const before = gitText(["rev-parse", "HEAD"], { cwd: fixture.repo, env: fixture.env });
+
+    const result = runCli(
+      ["template", "register", "--path", fixture.repo],
+      fixture.env,
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      gitText(["rev-parse", "HEAD"], { cwd: fixture.repo, env: fixture.env }),
+      before,
+    );
+    assert.equal(existsSync(join(fixture.repo, ".gitignore")), false);
+    const porcelain = gitText(["status", "--porcelain"], {
+      cwd: fixture.repo,
+      env: fixture.env,
+    });
+    assert.equal(porcelain, "");
   });
 
   it("fails when the repository is already a tembiter project", () => {

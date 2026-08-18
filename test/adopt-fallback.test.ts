@@ -176,6 +176,7 @@ describe("tembiter adopt no-tags fallback", () => {
     assert.match(result.stderr, /Did not bind the project/);
     assert.equal(existsSync(join(project.repo, ".tembiter")), false);
     assert.equal(existsSync(join(project.repo, ".tembiter", "config.json")), false);
+    assert.equal(existsSync(join(project.repo, ".gitignore")), false);
     assert.equal(
       gitText(["rev-list", "--count", "HEAD"], { cwd: project.repo, env }),
       countBefore,
@@ -231,6 +232,7 @@ describe("tembiter adopt no-tags fallback", () => {
     assert.match(result.stderr, /no version tags/);
     assert.doesNotMatch(result.stdout, /Candidate commit:/);
     assert.equal(existsSync(join(project.repo, ".tembiter")), false);
+    assert.equal(existsSync(join(project.repo, ".gitignore")), false);
   });
 
   it("fails when the project has several root commits", () => {
@@ -267,6 +269,7 @@ describe("tembiter adopt no-tags fallback", () => {
     assert.match(result.stderr, new RegExp(secondRoot));
     assert.doesNotMatch(result.stdout, /Candidate commit:/);
     assert.equal(existsSync(join(repo, ".tembiter")), false);
+    assert.equal(existsSync(join(repo, ".gitignore")), false);
   });
 
   it("fails when no template commit matches the first-commit calendar day", () => {
@@ -287,6 +290,7 @@ describe("tembiter adopt no-tags fallback", () => {
     assert.match(result.stderr, /No template commit has committer calendar day 2023-12-01/);
     assert.doesNotMatch(result.stdout, /Candidate commit:/);
     assert.equal(existsSync(join(project.repo, ".tembiter")), false);
+    assert.equal(existsSync(join(project.repo, ".gitignore")), false);
   });
 
   it("binds after the owner tags the suggested commit outside tembiter", () => {
@@ -326,6 +330,10 @@ describe("tembiter adopt no-tags fallback", () => {
     );
     assert.equal(bound.status, 0, bound.stderr);
     assert.equal(existsSync(join(project.repo, ".tembiter", "config.json")), true);
+    assert.match(
+      gitText(["show", "HEAD:.gitignore"], { cwd: project.repo, env }),
+      /^\.tembiter\/sync\/$/m,
+    );
     const config = readConfig(project.repo);
     assert.equal(config.kind, "project");
     if (config.kind === "project") {

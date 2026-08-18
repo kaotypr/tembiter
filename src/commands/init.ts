@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { CONFIG_DIR, projectConfig, writeConfig } from "../format/config.js";
+import { ensureSyncGitignore } from "../format/gitignore.js";
 import {
   GitError,
   gitConfigGet,
@@ -304,6 +305,7 @@ export function initFromFlags(
 
   progress.step("Writing .tembiter/…");
   writeConfig(target, projectConfig(template, tag));
+  ensureSyncGitignore(target);
   progress.step("Creating initial commit…");
   initRepository(target, message, env);
   progress.done(`Created project at ${target} from ${template}@${tag}.`);

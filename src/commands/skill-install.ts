@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { ConfigError, readConfig } from "../format/config.js";
+import { ensureSyncGitignore } from "../format/gitignore.js";
 import { GitError, runGit } from "../git.js";
 import {
   getCatalogEntry,
@@ -237,6 +238,7 @@ export function installSkillFromFlags(
   const target = resolveTargetDir(flags.path as string);
   assertGitRepository(target);
   assertPurposeMatches(target, entry);
+  ensureSyncGitignore(target);
   progress.step(`Installing ${entry.id} into ${target}…`);
   copySkill(entry, target);
   if (existsSync(join(target, CLAUDE_DIR))) {
