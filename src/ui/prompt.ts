@@ -1,5 +1,5 @@
 import { createInterface } from "node:readline/promises";
-import { cyan, type TtyStream } from "./color.js";
+import { cyan, dim, type TtyStream } from "./color.js";
 import { selectChoice, type SelectChoice } from "./select.js";
 
 export class PromptCancelled extends Error {
@@ -88,13 +88,36 @@ export function createReadlinePrompt(
   return prompt;
 }
 
+export type PromptFlagOptions = {
+  title: string;
+  description: string;
+  required: boolean;
+  defaultLabel?: string;
+};
+
+function fieldHint(options: PromptFlagOptions): string {
+  if (options.required) {
+    return "required";
+  }
+  if (options.defaultLabel !== undefined) {
+    return `optional, Enter for "${options.defaultLabel}"`;
+  }
+  return "optional";
+}
+
+function writeFieldCopy(io: PromptIo, options: PromptFlagOptions): void {
+  io.write(`${cyan(`${options.title}  (${fieldHint(options)})`)}\n`);
+  io.write(`${dim(`  ${options.description}`)}\n`);
+}
+
 export async function promptFlag(
   io: PromptIo,
   flag: string,
-  options: { required: boolean },
+  options: PromptFlagOptions,
 ): Promise<string | undefined> {
   const query = `--${flag}: `;
   while (true) {
+    writeFieldCopy(io, options);
     const answer = (await io.question(query)).trim();
     if (answer.length > 0) {
       return answer;

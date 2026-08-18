@@ -10,7 +10,9 @@ import {
   templateConfig,
   writeConfig,
 } from "../format/config.js";
+import { ensureSyncGitignore, GITIGNORE_FILE } from "../format/gitignore.js";
 import { GitError, gitConfigGet, runGit } from "../git.js";
+import { createProgressReporter, type ProgressReporter } from "../ui/progress.js";
 
 export const DEFAULT_COMMIT_MESSAGE = "Register tembiter template";
 
@@ -147,14 +149,20 @@ function pathInIndex(
   return result.status === 0;
 }
 
+function commitPaths(gitignoreChanged: boolean): string[] {
+  return gitignoreChanged ? [CONFIG_DIR, GITIGNORE_FILE] : [CONFIG_DIR];
+}
+
 function commitTembiter(
   cwd: string,
   message: string,
   env: NodeJS.ProcessEnv,
+  gitignoreChanged: boolean,
 ): void {
   requireGitIdentity(cwd, env);
-  runGit(["add", "--", CONFIG_DIR], { cwd, env });
-  const cached = runGit(["diff", "--cached", "--quiet", "--", CONFIG_DIR], {
+  const paths = commitPaths(gitignoreChanged);
+  runGit(["add", "--", ...paths], { cwd, env });
+  const cached = runGit(["diff", "--cached", "--quiet", "--", ...paths], {
     cwd,
     env,
     allowFailure: true,
@@ -162,7 +170,7 @@ function commitTembiter(
   if (cached.status === 0) {
     return;
   }
-  runGit(["commit", "-m", message, "--", CONFIG_DIR], { cwd, env });
+  runGit(["commit", "-m", message, "--", ...paths], { cwd, env });
 }
 
 function existingTemplateConfig(repoRoot: string): "template" | "project" | "none" {
@@ -186,6 +194,7 @@ function existingTemplateConfig(repoRoot: string): "template" | "project" | "non
 export function registerFromFlags(
   flags: RegisterFlags,
   env: NodeJS.ProcessEnv = process.env,
+  progress: ProgressReporter = createProgressReporter(process.stdout),
 ): void {
   const message = flags.message ?? DEFAULT_COMMIT_MESSAGE;
   const repoRoot = resolveGitRoot(flags.path, env);
@@ -203,27 +212,36 @@ export function registerFromFlags(
     const inHead = pathInHead(repoRoot, CONFIG_RELATIVE_PATH, env);
     const inIndex = pathInIndex(repoRoot, CONFIG_RELATIVE_PATH, env);
     if (inHead && inIndex) {
+      progress.done(`Registered template at ${repoRoot}.`);
       return;
     }
-    commitTembiter(repoRoot, message, env);
+    progress.step("Creating commit…");
+    const gitignoreChanged = ensureSyncGitignore(repoRoot);
+    commitTembiter(repoRoot, message, env, gitignoreChanged);
+    progress.done(`Registered template at ${repoRoot}.`);
     return;
   }
 
+  progress.step("Writing .tembiter/…");
   writeConfig(repoRoot, templateConfig());
-  commitTembiter(repoRoot, message, env);
+  progress.step("Creating commit…");
+  const gitignoreChanged = ensureSyncGitignore(repoRoot);
+  commitTembiter(repoRoot, message, env, gitignoreChanged);
+  progress.done(`Registered template at ${repoRoot}.`);
 }
 
 export function runRegister(
   args: string[],
-  options: { env?: NodeJS.ProcessEnv } = {},
+  options: { env?: NodeJS.ProcessEnv; progress?: ProgressReporter } = {},
 ): number {
+  const progress = options.progress ?? createProgressReporter(process.stdout);
   try {
     const flags = parseRegisterFlags(args);
     if (flags.help) {
       printRegisterUsage(process.stdout);
       return 0;
     }
-    registerFromFlags(flags, options.env ?? process.env);
+    registerFromFlags(flags, options.env ?? process.env, progress);
     return 0;
   } catch (err) {
     if (err instanceof CliError) {
@@ -231,10 +249,12 @@ export function runRegister(
       if (err.showUsage) {
         printRegisterUsage(process.stderr);
       }
+      progress.fail();
       return err.exitCode;
     }
     if (err instanceof GitError) {
       process.stderr.write(`${err.message}\n`);
+      progress.fail();
       return 1;
     }
     throw err;

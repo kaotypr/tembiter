@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { ConfigError, readConfig } from "../format/config.js";
+import { ensureSyncGitignore } from "../format/gitignore.js";
 import { GitError, runGit } from "../git.js";
 import {
   getCatalogEntry,
@@ -15,6 +16,7 @@ import {
   skillSourceDir,
   type CatalogEntry,
 } from "../skills/catalog.js";
+import { createProgressReporter, type ProgressReporter } from "../ui/progress.js";
 import { CliError } from "./init.js";
 
 export type SkillInstallFlags = {
@@ -182,10 +184,10 @@ function linkExists(path: string): boolean {
   }
 }
 
-function linkClaudeSkill(entry: CatalogEntry, target: string): void {
+function linkClaudeSkill(entry: CatalogEntry, target: string): boolean {
   const claudeRoot = join(target, CLAUDE_DIR);
   if (!existsSync(claudeRoot)) {
-    return;
+    return false;
   }
 
   const claudeStat = lstatSync(claudeRoot);
@@ -218,9 +220,13 @@ function linkClaudeSkill(entry: CatalogEntry, target: string): void {
       `Could not create symlink at ${join(CLAUDE_SKILLS_DIR, entry.id)} -> ${linkTarget}. This platform could not create a symlink. ${detail}`,
     );
   }
+  return true;
 }
 
-export function installSkillFromFlags(flags: SkillInstallFlags): void {
+export function installSkillFromFlags(
+  flags: SkillInstallFlags,
+  progress: ProgressReporter = createProgressReporter(process.stdout),
+): void {
   const missing = missingRequired(flags);
   if (missing.length > 0) {
     throw new CliError(`Missing required flags: ${missing.join(", ")}.`, {
@@ -232,18 +238,28 @@ export function installSkillFromFlags(flags: SkillInstallFlags): void {
   const target = resolveTargetDir(flags.path as string);
   assertGitRepository(target);
   assertPurposeMatches(target, entry);
+  ensureSyncGitignore(target);
+  progress.step(`Installing ${entry.id} into ${target}…`);
   copySkill(entry, target);
+  if (existsSync(join(target, CLAUDE_DIR))) {
+    progress.step(`Linking .claude/skills/${entry.id}…`);
+  }
   linkClaudeSkill(entry, target);
+  progress.done(`Installed ${entry.id} at ${join(target, AGENTS_SKILLS_DIR, entry.id)}.`);
 }
 
-export function runSkillInstall(args: string[]): number {
+export function runSkillInstall(
+  args: string[],
+  options: { progress?: ProgressReporter } = {},
+): number {
+  const progress = options.progress ?? createProgressReporter(process.stdout);
   try {
     const flags = parseSkillInstallFlags(args);
     if (flags.help) {
       printSkillInstallUsage(process.stdout);
       return 0;
     }
-    installSkillFromFlags(flags);
+    installSkillFromFlags(flags, progress);
     return 0;
   } catch (err) {
     if (err instanceof CliError) {
@@ -251,10 +267,12 @@ export function runSkillInstall(args: string[]): number {
       if (err.showUsage) {
         printSkillInstallUsage(process.stderr);
       }
+      progress.fail();
       return err.exitCode;
     }
     if (err instanceof GitError) {
       process.stderr.write(`${err.message}\n`);
+      progress.fail();
       return 1;
     }
     throw err;

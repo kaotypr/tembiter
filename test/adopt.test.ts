@@ -175,8 +175,15 @@ describe("tembiter adopt", () => {
     const committedFiles = gitText(
       ["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"],
       { cwd: project.repo, env: template.env },
+    )
+      .split("\n")
+      .filter((line) => line.length > 0)
+      .sort();
+    assert.deepEqual(committedFiles, [".gitignore", ".tembiter/config.json"]);
+    assert.match(
+      gitText(["show", "HEAD:.gitignore"], { cwd: project.repo, env: template.env }),
+      /^\.tembiter\/sync\/$/m,
     );
-    assert.equal(committedFiles, ".tembiter/config.json");
     assert.equal(
       gitText(["log", "-1", "--format=%s"], { cwd: project.repo, env: template.env }),
       `Connect tembiter to ${template.repo}@${template.tag}`,
@@ -329,6 +336,7 @@ describe("tembiter adopt", () => {
     assert.match(withTag.stderr, /does not invent a version/);
     assert.doesNotMatch(withTag.stdout, /Candidate commit:/);
     assert.equal(existsSync(join(project.repo, ".tembiter", "config.json")), false);
+    assert.equal(existsSync(join(project.repo, ".gitignore")), false);
     assert.equal(
       gitText(["rev-list", "--count", "HEAD"], { cwd: project.repo, env: tagged.env }),
       "2",
@@ -381,6 +389,48 @@ describe("tembiter adopt", () => {
     );
   });
 
+  it("does not write gitignore on a true no-op already-connected project", () => {
+    const root = tempDir();
+    const template = createTaggedTemplate(root);
+    const project = createProjectFixture(root, template.env);
+    writeConfig(project.repo, {
+      formatVersion: 1,
+      kind: "project",
+      template: {
+        identity: template.repo,
+        version: template.tag,
+      },
+    });
+    runGit(["add", ".tembiter"], { cwd: project.repo, env: template.env });
+    runGit(["commit", "-m", "already connected"], { cwd: project.repo, env: template.env });
+    const before = gitText(["rev-parse", "HEAD"], { cwd: project.repo, env: template.env });
+
+    const result = runCli(
+      [
+        "adopt",
+        "--template",
+        template.repo,
+        "--tag",
+        template.tag,
+        "--project",
+        project.repo,
+      ],
+      template.env,
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      gitText(["rev-parse", "HEAD"], { cwd: project.repo, env: template.env }),
+      before,
+    );
+    assert.equal(existsSync(join(project.repo, ".gitignore")), false);
+    const porcelain = gitText(["status", "--porcelain"], {
+      cwd: project.repo,
+      env: template.env,
+    });
+    assert.equal(porcelain, "");
+  });
+
   it("commits matching untracked config.json", () => {
     const root = tempDir();
     const template = createTaggedTemplate(root);
@@ -412,12 +462,15 @@ describe("tembiter adopt", () => {
       gitText(["rev-list", "--count", "HEAD"], { cwd: project.repo, env: template.env }),
       "3",
     );
-    assert.equal(
+    assert.deepEqual(
       gitText(["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"], {
         cwd: project.repo,
         env: template.env,
-      }),
-      ".tembiter/config.json",
+      })
+        .split("\n")
+        .filter((line) => line.length > 0)
+        .sort(),
+      [".gitignore", ".tembiter/config.json"],
     );
   });
 
