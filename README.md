@@ -3,12 +3,12 @@
 Tembiter is an arbiter: its own files, formats, and conventions; a setup CLI (`npx tembiter`); and skills. The CLI writes that format onto a template and a project. An AI agent using the skills and those files brings later template updates into the project.
 
 ```sh
-npx tembiter@alpha
-npx tembiter@alpha --help
-npx tembiter@alpha --version
+npx tembiter
+npx tembiter --help
+npx tembiter --version
 ```
 
-`npx tembiter` (no tag) tracks npm `latest` (today the name-claim stub) until a later non-prerelease.
+`npx tembiter` tracks npm `latest`, which is the stable release line.
 
 ## Local development
 
