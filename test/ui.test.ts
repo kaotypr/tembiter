@@ -342,10 +342,28 @@ describe("interactive setup UI", () => {
     assert.match(menu, /template register/);
     assert.match(menu, /adopt/);
     assert.match(menu, /skill install/);
+    assert.match(menu, /Start a new project from a template tag/);
+    assert.match(menu, /Mark a git repository as a tembiter template/);
+    assert.match(menu, /Connect an existing project to a tagged template/);
+    assert.match(menu, /Install a packaged skill onto a template or project/);
     assert.doesNotMatch(menu, /update/);
+    const choices = pickerSelectChoices();
     assert.deepEqual(
-      pickerSelectChoices().map((choice) => choice.value),
+      choices.map((choice) => choice.value),
       [["init"], ["template", "register"], ["adopt"], ["skill", "install"]],
+    );
+    assert.deepEqual(
+      choices.map((choice) => choice.label),
+      ["init", "template register", "adopt", "skill install"],
+    );
+    assert.deepEqual(
+      choices.map((choice) => choice.description),
+      [
+        "Start a new project from a template tag",
+        "Mark a git repository as a tembiter template",
+        "Connect an existing project to a tagged template",
+        "Install a packaged skill onto a template or project",
+      ],
     );
   });
 
@@ -368,10 +386,23 @@ describe("interactive setup UI", () => {
       "--tag: ",
       "--message: ",
     ]);
+    const initWrites = prompt.writes.join("");
+    assert.match(initWrites, /Template repository/);
+    assert.match(initWrites, /Local git repository path or git URL \(file:\/\/ allowed\)/);
+    assert.match(initWrites, /New project directory/);
+    assert.match(initWrites, /Destination directory \(must not exist or must be empty\)/);
+    assert.match(initWrites, /Template version/);
+    assert.match(initWrites, /An existing git tag on that repository/);
+    assert.match(initWrites, /First-commit message/);
+    assert.match(initWrites, /Overrides the first commit message/);
+    assert.match(initWrites, /optional, Enter for "Initial commit"/);
     assert.match(result.stdout, /template/);
     assert.match(result.stdout, /project/);
     assert.match(result.stdout, /◆/);
     assert.doesNotMatch(result.stdout, /TEMBITER/);
+    assert.match(result.stdout, /Copying tag v1\.0\.0 into /);
+    assert.match(result.stdout, /Done\. Created project at /);
+    assert.ok(result.stdout.includes(target));
     assert.equal(gitText(["rev-list", "--count", "HEAD"], { cwd: target, env: fixture.env }), "1");
     assert.equal(
       gitText(["log", "-1", "--format=%s"], { cwd: target, env: fixture.env }),
@@ -405,6 +436,9 @@ describe("interactive setup UI", () => {
       "--tag: ",
       "--message: ",
     ]);
+    const promptWrites = prompt.writes.join("");
+    assert.match(promptWrites, /Template repository/);
+    assert.match(promptWrites, /First-commit message/);
     assert.doesNotMatch(result.stdout, /◆/);
     assert.doesNotMatch(prompt.writes.join(""), /◆/);
     assert.equal(
@@ -430,6 +464,54 @@ describe("interactive setup UI", () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.equal(readConfig(target).kind, "project");
+    assert.match(result.stdout, /Copying tag v1\.0\.0 into /);
+    assert.match(result.stdout, /Done\. Created project at /);
+    assert.ok(result.stdout.includes(target));
+    assert.doesNotMatch(result.stdout, /Cloning template/);
+  });
+
+  it("TTY init with a missing tag prints Failed and does not write a project", async () => {
+    const root = tempDir();
+    const fixture = createTemplateFixture(root);
+    const target = join(root, "missing-tag");
+
+    const result = await runMain(
+      ["init", "--template", fixture.repo, "--target", target, "--tag", "no-such-tag"],
+      {
+        ...ttyStreams(),
+        prompt: throwingPrompt(),
+        env: fixture.env,
+      },
+    );
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout, /Failed\./);
+    assert.match(result.stderr, /Pass an existing --tag/);
+    assert.doesNotMatch(result.stdout, /Pass an existing --tag/);
+    assert.equal(existsSync(join(target, ".tembiter")), false);
+    assert.equal(existsSync(join(target, ".git")), false);
+  });
+
+  it("non-TTY successful init does not print Done", async () => {
+    const root = tempDir();
+    const fixture = createTemplateFixture(root);
+    const target = join(root, "quiet");
+
+    const result = await runMain(
+      ["init", "--template", fixture.repo, "--target", target, "--tag", fixture.tag],
+      {
+        stdin: { isTTY: false } as MainOptions["stdin"],
+        stdout: { isTTY: false } as MainOptions["stdout"],
+        prompt: throwingPrompt(),
+        env: fixture.env,
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stdout, /Done\./);
+    assert.doesNotMatch(result.stdout, /Copying tag/);
+    assert.doesNotMatch(result.stdout, /Failed\./);
+    assert.equal(readConfig(target).kind, "project");
   });
 
   it("fake picker answers for template register match the flags path", async () => {
@@ -452,6 +534,14 @@ describe("interactive setup UI", () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(prompt.questions, ["--path: ", "--message: "]);
+    const registerWrites = prompt.writes.join("");
+    assert.match(registerWrites, /Template repository/);
+    assert.match(registerWrites, /Git repository to mark/);
+    assert.match(registerWrites, /Commit message/);
+    assert.match(registerWrites, /Overrides the register commit message/);
+    assert.match(registerWrites, /optional, Enter for "current working directory"/);
+    assert.match(registerWrites, /optional, Enter for "Register tembiter template"/);
+    assert.match(result.stdout, /Done\. Registered template at /);
     const config = readConfig(repo);
     assert.equal(config.kind, "template");
     assert.equal(gitText(["rev-list", "--count", "HEAD"], { cwd: repo, env: fixture.env }), "2");
@@ -485,6 +575,12 @@ describe("interactive setup UI", () => {
       "--project: ",
       "--message: ",
     ]);
+    const adoptWrites = prompt.writes.join("");
+    assert.match(adoptWrites, /Template repository/);
+    assert.match(adoptWrites, /Existing git tag; omit when the template has no tags/);
+    assert.match(adoptWrites, /Project repository/);
+    assert.match(adoptWrites, /Overrides the connect commit message/);
+    assert.match(result.stdout, /Done\. Connected /);
     assert.equal(
       gitText(["rev-parse", "HEAD^"], { cwd: project, env: template.env }),
       parentBefore,
@@ -516,6 +612,8 @@ describe("interactive setup UI", () => {
 
     assert.notEqual(result.status, 0);
     assert.match(result.stdout, /assistance only/);
+    assert.match(result.stdout, /write \.tembiter\//);
+    assert.match(result.stdout, /Failed\./);
     assert.match(result.stderr, /Did not bind the project/);
     assert.equal(existsSync(join(project, ".tembiter")), false);
     assert.equal(gitText(["rev-list", "--count", "HEAD"], { cwd: project, env }), countBefore);
@@ -559,7 +657,7 @@ describe("interactive setup UI", () => {
   it("fake prompt answers for skill install match the flags path", async () => {
     const root = tempDir();
     const project = createSkillRepo(root, "project", "project");
-    const prompt = scriptedPrompt(["tembiter-apply-template-update", project.repo]);
+    const prompt = scriptedPrompt(["tembiter-sync", project.repo]);
 
     const result = await runMain(["skill", "install"], {
       ...ttyStreams(),
@@ -569,11 +667,20 @@ describe("interactive setup UI", () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(prompt.questions, ["--skill: ", "--path: "]);
+    const skillWrites = prompt.writes.join("");
+    assert.match(skillWrites, /Skill id/);
+    assert.match(
+      skillWrites,
+      /Catalog id \(tembiter-sync \(project\), tembiter-setup \(template\)\)/,
+    );
+    assert.match(skillWrites, /Repository root/);
+    assert.match(skillWrites, /Template or project repository root/);
+    assert.match(result.stdout, /Done\. Installed tembiter-sync at /);
     const installed = join(
       project.repo,
       ".agents",
       "skills",
-      "tembiter-apply-template-update",
+      "tembiter-sync",
       "SKILL.md",
     );
     assert.equal(existsSync(installed), true);
@@ -583,7 +690,7 @@ describe("interactive setup UI", () => {
   it("fake picker select for skill install produces the same install as flags", async () => {
     const root = tempDir();
     const project = createSkillRepo(root, "picker-project", "project");
-    const prompt = scriptedPrompt(["tembiter-apply-template-update", project.repo], ["skill", "install"]);
+    const prompt = scriptedPrompt(["tembiter-sync", project.repo], ["skill", "install"]);
 
     const result = await runMain([], {
       ...ttyStreams(),
@@ -594,7 +701,7 @@ describe("interactive setup UI", () => {
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(prompt.questions, ["--skill: ", "--path: "]);
     assert.equal(
-      existsSync(join(project.repo, ".agents", "skills", "tembiter-apply-template-update", "SKILL.md")),
+      existsSync(join(project.repo, ".agents", "skills", "tembiter-sync", "SKILL.md")),
       true,
     );
   });
@@ -665,17 +772,22 @@ describe("interactive setup UI", () => {
     });
     assert.deepEqual(value, ["skill", "install"]);
     assert.deepEqual(questions, ["Command: "]);
-    assert.match(writes.join(""), /1\) init/);
-    assert.doesNotMatch(writes.join(""), /update/);
+    const numbered = writes.join("");
+    assert.match(numbered, /1\) init/);
+    assert.match(numbered, /Start a new project from a template tag/);
+    assert.match(numbered, /Install a packaged skill onto a template or project/);
+    assert.doesNotMatch(numbered, /update/);
   });
 
   it("raw-mode select moves with arrows and confirms Enter without a real TTY", async () => {
     const stdin = fakeRawStdin();
+    const writes: string[] = [];
     const pending = selectChoice(pickerSelectChoices(), {
       stdin,
       stdout: {
         isTTY: true,
-        write() {
+        write(chunk: string) {
+          writes.push(chunk);
           return true;
         },
       } as unknown as NodeJS.WritableStream & { isTTY?: boolean },
@@ -685,6 +797,10 @@ describe("interactive setup UI", () => {
       stdin.emitData("\r");
     });
     assert.deepEqual(await withTimeout(pending), ["template", "register"]);
+    const rawOut = writes.join("");
+    assert.match(rawOut, /Start a new project from a template tag/);
+    assert.match(rawOut, /Mark a git repository as a tembiter template/);
+    assert.match(rawOut, /\x1b\[10F/);
   });
 
   it("raw-mode select treats digit 1-4 as an immediate choice", async () => {

@@ -1,6 +1,6 @@
 {
   "name": "tembiter",
-  "version": "0.0.1-alpha.2",
+  "version": "0.1.0",
   "private": false,
   "description": "Arbiter for template format, setup CLI, and skills.",
   "license": "MIT",

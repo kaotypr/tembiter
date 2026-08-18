@@ -54,9 +54,9 @@ describe("resolveNpmDistTag", () => {
 
 describe("npm-dist-tag CLI", () => {
   it("prints only the dist-tag for the matching package version", () => {
-    const result = runHelper({ ...process.env, GITHUB_REF_NAME: "v0.0.1-alpha.2" });
+    const result = runHelper({ ...process.env, GITHUB_REF_NAME: "v0.1.0" });
     assert.equal(result.status, 0);
-    assert.equal(result.stdout, "alpha\n");
+    assert.equal(result.stdout, "latest\n");
   });
 
   it("exits non-zero with no dist-tag on stdout when the tag is missing v", () => {

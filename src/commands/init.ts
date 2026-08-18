@@ -10,12 +10,14 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { CONFIG_DIR, projectConfig, writeConfig } from "../format/config.js";
+import { ensureSyncGitignore } from "../format/gitignore.js";
 import {
   GitError,
   gitConfigGet,
   isGitUrl,
   runGit,
 } from "../git.js";
+import { createProgressReporter, type ProgressReporter } from "../ui/progress.js";
 
 export const DEFAULT_COMMIT_MESSAGE = "Initial commit";
 
@@ -214,6 +216,7 @@ function extractTagTree(repoPath: string, tag: string, target: string): void {
 function withTemplateRepo(
   template: string,
   env: NodeJS.ProcessEnv,
+  progress: ProgressReporter,
   fn: (repoPath: string) => void,
 ): void {
   if (!isGitUrl(template)) {
@@ -239,6 +242,7 @@ function withTemplateRepo(
     return;
   }
 
+  progress.step("Cloning template…");
   const cloneDir = mkdtempSync(join(tmpdir(), "tembiter-template-"));
   try {
     try {
@@ -267,6 +271,7 @@ function initRepository(target: string, message: string, env: NodeJS.ProcessEnv)
 export function initFromFlags(
   flags: InitFlags,
   env: NodeJS.ProcessEnv = process.env,
+  progress: ProgressReporter = createProgressReporter(process.stdout),
 ): void {
   const missing = missingRequired(flags);
   if (missing.length > 0) {
@@ -284,7 +289,8 @@ export function initFromFlags(
   assertTargetUsable(target);
   mkdirSync(target, { recursive: true });
 
-  withTemplateRepo(template, env, (repoPath) => {
+  withTemplateRepo(template, env, progress, (repoPath) => {
+    progress.step(`Copying tag ${tag} into ${target}…`);
     try {
       extractTagTree(repoPath, tag, target);
     } catch (err) {
@@ -297,21 +303,26 @@ export function initFromFlags(
     }
   });
 
+  progress.step("Writing .tembiter/…");
   writeConfig(target, projectConfig(template, tag));
+  ensureSyncGitignore(target);
+  progress.step("Creating initial commit…");
   initRepository(target, message, env);
+  progress.done(`Created project at ${target} from ${template}@${tag}.`);
 }
 
 export function runInit(
   args: string[],
-  options: { env?: NodeJS.ProcessEnv } = {},
+  options: { env?: NodeJS.ProcessEnv; progress?: ProgressReporter } = {},
 ): number {
+  const progress = options.progress ?? createProgressReporter(process.stdout);
   try {
     const flags = parseInitFlags(args);
     if (flags.help) {
       printInitUsage(process.stdout);
       return 0;
     }
-    initFromFlags(flags, options.env ?? process.env);
+    initFromFlags(flags, options.env ?? process.env, progress);
     return 0;
   } catch (err) {
     if (err instanceof CliError) {
@@ -319,10 +330,12 @@ export function runInit(
       if (err.showUsage) {
         printInitUsage(process.stderr);
       }
+      progress.fail();
       return err.exitCode;
     }
     if (err instanceof GitError) {
       process.stderr.write(`${err.message}\n`);
+      progress.fail();
       return 1;
     }
     throw err;
