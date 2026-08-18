@@ -130,6 +130,21 @@ describe("tembiter init", () => {
     const raw = readFileSync(join(target, ".tembiter", "config.json"), "utf8");
     assert.match(raw, /"kind": "project"/);
     assert.doesNotMatch(raw, /"kind": "template"/);
+
+    const committed = gitText(["ls-tree", "-r", "--name-only", "HEAD"], {
+      cwd: target,
+      env: fixture.env,
+    }).split("\n");
+    assert.ok(committed.includes(".tembiter/config.json"));
+    assert.ok(committed.includes(".gitignore"));
+    assert.equal(
+      committed.some((name) => name === ".tembiter/sync" || name.startsWith(".tembiter/sync/")),
+      false,
+    );
+    assert.match(
+      gitText(["show", "HEAD:.gitignore"], { cwd: target, env: fixture.env }),
+      /^\.tembiter\/sync\/$/m,
+    );
   });
 
   it("overrides the first-commit message with --message", () => {

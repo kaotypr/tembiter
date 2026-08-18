@@ -657,7 +657,7 @@ describe("interactive setup UI", () => {
   it("fake prompt answers for skill install match the flags path", async () => {
     const root = tempDir();
     const project = createSkillRepo(root, "project", "project");
-    const prompt = scriptedPrompt(["tembiter-apply-template-update", project.repo]);
+    const prompt = scriptedPrompt(["tembiter-sync", project.repo]);
 
     const result = await runMain(["skill", "install"], {
       ...ttyStreams(),
@@ -671,16 +671,16 @@ describe("interactive setup UI", () => {
     assert.match(skillWrites, /Skill id/);
     assert.match(
       skillWrites,
-      /Catalog id \(tembiter-apply-template-update, tembiter-prepare-template\)/,
+      /Catalog id \(tembiter-sync \(project\), tembiter-setup \(template\)\)/,
     );
     assert.match(skillWrites, /Repository root/);
     assert.match(skillWrites, /Template or project repository root/);
-    assert.match(result.stdout, /Done\. Installed tembiter-apply-template-update at /);
+    assert.match(result.stdout, /Done\. Installed tembiter-sync at /);
     const installed = join(
       project.repo,
       ".agents",
       "skills",
-      "tembiter-apply-template-update",
+      "tembiter-sync",
       "SKILL.md",
     );
     assert.equal(existsSync(installed), true);
@@ -690,7 +690,7 @@ describe("interactive setup UI", () => {
   it("fake picker select for skill install produces the same install as flags", async () => {
     const root = tempDir();
     const project = createSkillRepo(root, "picker-project", "project");
-    const prompt = scriptedPrompt(["tembiter-apply-template-update", project.repo], ["skill", "install"]);
+    const prompt = scriptedPrompt(["tembiter-sync", project.repo], ["skill", "install"]);
 
     const result = await runMain([], {
       ...ttyStreams(),
@@ -701,7 +701,7 @@ describe("interactive setup UI", () => {
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(prompt.questions, ["--skill: ", "--path: "]);
     assert.equal(
-      existsSync(join(project.repo, ".agents", "skills", "tembiter-apply-template-update", "SKILL.md")),
+      existsSync(join(project.repo, ".agents", "skills", "tembiter-sync", "SKILL.md")),
       true,
     );
   });
