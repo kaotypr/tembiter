@@ -703,8 +703,11 @@ describe("interactive setup UI", () => {
     it(`Escape from ${choice.join(" ")} returns to the picker`, async () => {
       const selections = [choice, undefined] as const;
       let selection = 0;
+      const writes: string[] = [];
       const prompt: PromptIo = {
-        write() {},
+        write(text: string) {
+          writes.push(text);
+        },
         question() {
           return Promise.reject(new Error("question should not be called"));
         },
@@ -725,6 +728,7 @@ describe("interactive setup UI", () => {
 
       assert.equal(result.status, 1);
       assert.equal(selection, 2);
+      assert.match(writes.join(""), /\x1b\[3F/);
     });
   }
 

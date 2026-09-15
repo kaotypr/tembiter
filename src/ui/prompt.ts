@@ -177,6 +177,15 @@ function writeFieldCopy(io: PromptIo, options: PromptFlagOptions): void {
   io.write(`${dim(`  ${options.description}`)}\n`);
 }
 
+function clearFieldCopy(io: PromptIo): void {
+  const renderedLines = 3;
+  io.write(`\x1b[${renderedLines}F`);
+  for (let line = 0; line < renderedLines; line += 1) {
+    io.write("\x1b[2K\n");
+  }
+  io.write(`\x1b[${renderedLines}F`);
+}
+
 export async function promptFlag(
   io: PromptIo,
   flag: string,
@@ -189,6 +198,7 @@ export async function promptFlag(
       ? { kind: "value" as const, value: await io.question(query) }
       : await io.input(query);
     if (result.kind === "back") {
+      clearFieldCopy(io);
       throw new PromptBack();
     }
     const answer = result.value.trim();
