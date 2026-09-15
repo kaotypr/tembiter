@@ -71,6 +71,7 @@ function clearList(
   for (const _line of lines) {
     stdout.write("\x1b[2K\n");
   }
+  stdout.write(`\x1b[${lines.length}F`);
 }
 
 function consumeKey(buffer: string): { key: string; rest: string } | undefined {

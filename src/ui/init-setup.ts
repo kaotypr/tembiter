@@ -44,6 +44,7 @@ function clearSetupPage(io: PromptIo, renderedLines: number): void {
   for (let line = 0; line < renderedLines; line += 1) {
     io.write("\x1b[2K\n");
   }
+  io.write(`\x1b[${renderedLines}F`);
 }
 
 function backFromSetup(io: PromptIo, renderedFields: number): InitSetupResult {
