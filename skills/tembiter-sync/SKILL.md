@@ -143,7 +143,7 @@ not choose a host as a product requirement.
 
 - Do not tell the human to run `npx tembiter` for this bump. There is
   no human `tembiter update` command. Setup CLI (`init`,
-  `template register`, `adopt`, `skill install`) is not the bump
+  `adopt`, `skill install`) is not the bump
   workflow.
 - Do not treat a changelog, diff listing, or generated notes as done.
   Done means the later tag is applied in the git worktree on

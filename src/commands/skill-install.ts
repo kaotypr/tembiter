@@ -35,11 +35,11 @@ export function printSkillInstallUsage(stream: NodeJS.WritableStream): void {
   stream.write("Usage:\n");
   stream.write("  tembiter skill install --skill <id> --path <dir>\n");
   stream.write("\n");
-  stream.write("Install a packaged skill into a template or project repository.\n");
+  stream.write("Install a packaged skill into a connected project repository.\n");
   stream.write("\n");
   stream.write("Flags:\n");
   stream.write(`  --skill  Catalog id (${knownSkillSummary()})\n`);
-  stream.write("  --path   Template or project repository root\n");
+  stream.write("  --path   Connected project repository root\n");
 }
 
 function assignFlag(flags: SkillInstallFlags, key: string, value: string): void {
@@ -136,13 +136,13 @@ function resolveTargetDir(pathArg: string): string {
   const target = resolve(pathArg);
   if (!existsSync(target)) {
     throw new CliError(
-      `Path does not exist: ${pathArg}. Pass an existing template or project directory.`,
+      `Path does not exist: ${pathArg}. Pass an existing connected project directory.`,
     );
   }
   const stat = lstatSync(target);
   if (!stat.isDirectory()) {
     throw new CliError(
-      `Path is not a directory: ${pathArg}. Pass a template or project repository root.`,
+      `Path is not a directory: ${pathArg}. Pass a connected project repository root.`,
     );
   }
   return target;

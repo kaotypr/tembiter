@@ -63,6 +63,17 @@ function writeList(
   }
 }
 
+function clearList(
+  stdout: NodeJS.WritableStream & TtyStream,
+  lines: readonly string[],
+): void {
+  stdout.write(`\x1b[${lines.length}F`);
+  for (const _line of lines) {
+    stdout.write("\x1b[2K\n");
+  }
+  stdout.write(`\x1b[${lines.length}F`);
+}
+
 function consumeKey(buffer: string): { key: string; rest: string } | undefined {
   if (buffer.length === 0) {
     return undefined;
@@ -143,7 +154,8 @@ async function selectRaw<T>(
   stdin.resume();
   stdin.setEncoding("utf8");
 
-  writeList(stdout, listLines(choices, index, stdout), false);
+  const lines = listLines(choices, index, stdout);
+  writeList(stdout, lines, false);
 
   try {
     return await new Promise<T>((resolve, reject) => {
@@ -159,6 +171,7 @@ async function selectRaw<T>(
 
           if (key === CTRL_C) {
             cleanup();
+            clearList(stdout, lines);
             reject(new PromptCancelled());
             return;
           }
@@ -166,10 +179,12 @@ async function selectRaw<T>(
             const selected = choices[index];
             if (selected === undefined) {
               cleanup();
+              clearList(stdout, lines);
               reject(new PromptCancelled());
               return;
             }
             cleanup();
+            clearList(stdout, lines);
             resolve(selected.value);
             return;
           }
@@ -177,6 +192,7 @@ async function selectRaw<T>(
           const digit = choiceByDigit(choices, key);
           if (digit !== undefined) {
             cleanup();
+            clearList(stdout, lines);
             resolve(digit.value);
             return;
           }

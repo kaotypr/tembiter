@@ -22,7 +22,11 @@ npx --package . tembiter
 
 ### Interactive setup
 
-On a terminal, `npx tembiter` with no arguments shows a Tembiter welcome banner and an arrow-key list of the four setup commands (`init`, `template register`, `adopt`, `skill install`). Each command has a one-line description. Move with Up/Down or `j`/`k`, press Enter to confirm the highlight, or press `1`–`4` to select that command immediately. Then tembiter prompts for that command's options. Each field shows a short title, a description, whether it is required or optional, and a prompt label that matches the flag name (`--template`, `--target`, `--tag`, `--message`, `--path`, `--project`, `--skill`). Optional fields accept Enter to keep the documented default.
+On a terminal, `npx tembiter` with no arguments shows a Tembiter welcome banner and an arrow-key list of the three setup commands (`init`, `adopt`, `skill install`). Each command has a one-line description. Move with Up/Down or `j`/`k`, press Enter to confirm the highlight, or press `1`–`3` to select that command immediately.
+
+Choosing `init` opens a dedicated setup page that asks for `Template path:`, `Version tag:`, and `Project path:` in that order. All three values are required. Press Escape before init begins to return to the picker without creating files or running git. Picker-based init uses the default first-commit message, exactly `Initial commit`.
+
+The other picker choices and setup subcommands prompt for missing options. Each field shows a short title, a description, whether it is required or optional, and a prompt label that matches the flag name. Optional fields accept Enter to keep the documented default.
 
 A TTY run prints progress for long steps, then `Done.` or `Failed.` before exit. Running a setup subcommand on a terminal without its required flags continues in those prompts instead of only printing usage. It does not reprint the welcome banner. If every required flag is already present, tembiter does not prompt.
 
@@ -53,19 +57,6 @@ npx tembiter init \
 
 `tembiter init` copies that tag's file tree into `--target` (it does not clone the template as the project repository), writes `.tembiter/config.json` with the template identity and tag, adds `.tembiter/sync/` to `.gitignore` so nested sync worktrees stay untracked, runs `git init`, and creates one commit. `.tembiter/config.json` stays tracked.
 
-### Register a template
-
-```sh
-npx tembiter template register --path /path/to/template
-```
-
-| Flag | Required | Meaning |
-| --- | --- | --- |
-| `--path` | no | Git repository to mark; default current working directory |
-| `--message` | no | Commit message; default `Register tembiter template` |
-
-`tembiter template register` writes `.tembiter/config.json` with `kind: "template"` and creates one new commit of `.tembiter/` (and `.gitignore` when the ignore line `.tembiter/sync/` is added). `.tembiter/config.json` stays tracked. It does not create git tags. Tagging template versions is the repository owner's git operation (`git tag`).
-
 ### Connect an existing project
 
 Use `adopt` when the project already exists. If the template already has version tags, pass `--tag`. It writes `.tembiter/config.json` and creates one new commit of `.tembiter/` (and `.gitignore` when the ignore line `.tembiter/sync/` is added). `.tembiter/config.json` stays tracked. It does not copy template files and does not rewrite project history.
@@ -90,7 +81,7 @@ If the template has no tags, omit `--tag`. adopt prints the project's first-comm
 
 ### Install a packaged skill
 
-Skills ship in this package. They are not scraped from a template. Install them with `tembiter skill install` onto a template or a connected project.
+Skills ship in this package. They are not scraped from a template. Install them with `tembiter skill install` onto a connected project.
 
 ```sh
 npx tembiter skill install \
@@ -101,14 +92,13 @@ npx tembiter skill install \
 | Flag | Required | Meaning |
 | --- | --- | --- |
 | `--skill` | yes | Catalog id |
-| `--path` | yes | Template or project repository root (no default) |
+| `--path` | yes | Connected project repository root (no default) |
 
 | Skill id | Purpose |
 | --- | --- |
 | `tembiter-sync` | project |
-| `tembiter-setup` | template |
 
-Installing a skill onto the other kind of repository fails. Canonical files go under `<path>/.agents/skills/<id>/`, not under `.tembiter/`.
+Installing the project skill onto a template repository fails. Canonical files go under `<path>/.agents/skills/<id>/`, not under `.tembiter/`.
 
 If `<path>/.claude` already exists, tembiter creates `.claude/skills/` when needed and adds a symlink `.claude/skills/<id>` → `../../.agents/skills/<id>`. If `.claude` is absent, host linking is skipped and `.claude` is not created. A regular file already at the host skill path is an error.
 
@@ -116,9 +106,9 @@ If `<path>/.claude` already exists, tembiter creates `.claude/skills/` when need
 
 After setup, later bumps are an **AI agent** workflow using the skills installed by `tembiter skill install`. The agent creates a git worktree at `.tembiter/sync/<tag>` on branch `tembiter/sync-<tag>` from the project default/base branch, judges template vs project-specific changes there, and refreshes `.tembiter/config.json` inside that worktree. It does not merge into the user's current checkout. Optionally it may open an MR/PR from that branch if a git host is already configured.
 
-The CLI is **setup only** (`init`, `template register`, `adopt`, `skill install`). Setup commands ignore nested sync worktrees by adding `.tembiter/sync/` to `.gitignore`. The picker has no update command. Do not run the CLI for a later bump. There is no human update command.
+The CLI is **setup only** (`init`, `adopt`, `skill install`). Setup commands ignore nested sync worktrees by adding `.tembiter/sync/` to `.gitignore`. The picker has no update command. Do not run the CLI for a later bump. There is no human update command.
 
-Install `tembiter-sync` on a connected project before asking an agent to apply a later template tag. Install `tembiter-setup` on a template so the owner keeps `.tembiter/config.json` and git tags.
+Install `tembiter-sync` on a connected project before asking an agent to apply a later template tag.
 
 `npm test` compiles the package and runs the tests.
 

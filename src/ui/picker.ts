@@ -16,20 +16,14 @@ export const PICKER_COMMANDS: readonly PickerChoice[] = [
   },
   {
     key: "2",
-    label: "template register",
-    description: "Mark a git repository as a tembiter template",
-    argv: ["template", "register"],
-  },
-  {
-    key: "3",
     label: "adopt",
     description: "Connect an existing project to a tagged template",
     argv: ["adopt"],
   },
   {
-    key: "4",
+    key: "3",
     label: "skill install",
-    description: "Install a packaged skill onto a template or project",
+    description: "Install a packaged skill onto a connected project",
     argv: ["skill", "install"],
   },
 ];

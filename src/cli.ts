@@ -16,12 +16,6 @@ import {
   type InitFlags,
 } from "./commands/init.js";
 import {
-  parseRegisterFlags,
-  printRegisterUsage,
-  runRegister,
-  type RegisterFlags,
-} from "./commands/register.js";
-import {
   parseSkillInstallFlags,
   printSkillInstallUsage,
   runSkillInstall,
@@ -29,6 +23,7 @@ import {
 } from "./commands/skill-install.js";
 import { knownSkillSummary } from "./skills/catalog.js";
 import { printBanner } from "./ui/banner.js";
+import { promptInitSetup } from "./ui/init-setup.js";
 import { pickSetupCommand } from "./ui/picker.js";
 import {
   createProgressReporter,
@@ -37,6 +32,7 @@ import {
 import {
   createReadlinePrompt,
   detectInteractive,
+  PromptBack,
   PromptCancelled,
   promptFlag,
   type PromptFlagOptions,
@@ -98,21 +94,6 @@ const INIT_FIELDS = {
   },
 } as const satisfies Record<string, PromptFlagOptions>;
 
-const REGISTER_FIELDS = {
-  path: {
-    title: "Template repository",
-    description: "Git repository to mark",
-    required: false,
-    defaultLabel: "current working directory",
-  },
-  message: {
-    title: "Commit message",
-    description: "Overrides the register commit message",
-    required: false,
-    defaultLabel: "Register tembiter template",
-  },
-} as const satisfies Record<string, PromptFlagOptions>;
-
 const ADOPT_FIELDS = {
   template: {
     title: "Template repository",
@@ -146,7 +127,7 @@ const SKILL_INSTALL_FIELDS = {
   },
   path: {
     title: "Repository root",
-    description: "Template or project repository root",
+    description: "Connected project repository root",
     required: true,
   },
 } as const satisfies Record<string, PromptFlagOptions>;
@@ -159,7 +140,6 @@ function printUsage(stream: NodeJS.WritableStream): void {
   stream.write(
     "  tembiter init --template <path-or-url> --target <dir> --tag <git-tag> [--message <text>]\n",
   );
-  stream.write("  tembiter template register [--path <dir>] [--message <text>]\n");
   stream.write(
     "  tembiter adopt --template <path-or-url> [--tag <git-tag>] [--project <dir>] [--message <text>]\n",
   );
@@ -245,11 +225,6 @@ async function fillInit(flags: InitFlags, io: PromptIo): Promise<void> {
   await assignOptional(flags, "message", io, INIT_FIELDS.message);
 }
 
-async function fillRegister(flags: RegisterFlags, io: PromptIo): Promise<void> {
-  await assignOptional(flags, "path", io, REGISTER_FIELDS.path);
-  await assignOptional(flags, "message", io, REGISTER_FIELDS.message);
-}
-
 async function fillAdopt(flags: AdoptFlags, io: PromptIo): Promise<void> {
   if (flags.template === undefined || flags.template.length === 0) {
     flags.template = await promptFlag(io, "template", ADOPT_FIELDS.template);
@@ -287,31 +262,6 @@ async function handleInit(commandArgs: string[], ctx: CommandContext): Promise<n
   }
   if (ctx.fromPicker || missingInit(flags).length > 0) {
     await fillInit(flags, ctx.ensurePrompt());
-    afterFill(ctx);
-    return run(flagArgs(flags));
-  }
-  return run(commandArgs);
-}
-
-async function handleRegister(commandArgs: string[], ctx: CommandContext): Promise<number> {
-  const run = (args: string[]): number =>
-    runRegister(args, { env: ctx.env, progress: ctx.progress });
-
-  if (!ctx.interactive) {
-    return run(commandArgs);
-  }
-
-  let flags: RegisterFlags;
-  try {
-    flags = parseRegisterFlags(commandArgs);
-  } catch {
-    return run(commandArgs);
-  }
-  if (flags.help) {
-    return run(commandArgs);
-  }
-  if (ctx.fromPicker) {
-    await fillRegister(flags, ctx.ensurePrompt());
     afterFill(ctx);
     return run(flagArgs(flags));
   }
@@ -387,20 +337,6 @@ async function dispatch(args: string[], ctx: CommandContext): Promise<number> {
     return handleInit(args.slice(1), ctx);
   }
 
-  if (args[0] === "template") {
-    if (args[1] === "register") {
-      if (args.length === 3 && (args[2] === "--help" || args[2] === "-h")) {
-        printRegisterUsage(process.stdout);
-        return 0;
-      }
-      return handleRegister(args.slice(2), ctx);
-    }
-    const rest = args[1] === undefined ? "template" : `template ${args[1]}`;
-    process.stderr.write(`Not implemented: ${rest}\n`);
-    printUsage(process.stderr);
-    return 1;
-  }
-
   if (args[0] === "adopt") {
     if (args.length === 2 && (args[1] === "--help" || args[1] === "-h")) {
       printAdoptUsage(process.stdout);
@@ -469,12 +405,32 @@ export async function main(argv: string[], options: MainOptions = {}): Promise<n
         return 0;
       }
       printBanner(process.stdout, env);
-      const picked = await pickSetupCommand(ensurePrompt());
-      return await dispatch(picked, { ...ctx, fromPicker: true });
+      while (true) {
+        const picked = await pickSetupCommand(ensurePrompt());
+        if (picked[0] !== "init") {
+          try {
+            return await dispatch(picked, { ...ctx, fromPicker: true });
+          } catch (err) {
+            if (err instanceof PromptBack) {
+              continue;
+            }
+            throw err;
+          }
+        }
+        const setup = await promptInitSetup(ensurePrompt());
+        if (setup.kind === "back") {
+          continue;
+        }
+        afterFill(ctx);
+        return await dispatch(
+          ["init", "--template", setup.template, "--tag", setup.tag, "--target", setup.target],
+          ctx,
+        );
+      }
     }
     return await dispatch(args, ctx);
   } catch (err) {
-    if (err instanceof PromptCancelled) {
+    if (err instanceof PromptCancelled || err instanceof PromptBack) {
       return 1;
     }
     throw err;
