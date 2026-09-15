@@ -32,6 +32,7 @@ import {
 import {
   createReadlinePrompt,
   detectInteractive,
+  PromptBack,
   PromptCancelled,
   promptFlag,
   type PromptFlagOptions,
@@ -407,7 +408,14 @@ export async function main(argv: string[], options: MainOptions = {}): Promise<n
       while (true) {
         const picked = await pickSetupCommand(ensurePrompt());
         if (picked[0] !== "init") {
-          return await dispatch(picked, { ...ctx, fromPicker: true });
+          try {
+            return await dispatch(picked, { ...ctx, fromPicker: true });
+          } catch (err) {
+            if (err instanceof PromptBack) {
+              continue;
+            }
+            throw err;
+          }
         }
         const setup = await promptInitSetup(ensurePrompt());
         if (setup.kind === "back") {
@@ -422,7 +430,7 @@ export async function main(argv: string[], options: MainOptions = {}): Promise<n
     }
     return await dispatch(args, ctx);
   } catch (err) {
-    if (err instanceof PromptCancelled) {
+    if (err instanceof PromptCancelled || err instanceof PromptBack) {
       return 1;
     }
     throw err;

@@ -18,7 +18,7 @@ import { gitText, runGit } from "../src/git.js";
 import { TITLE, formatBanner, printBanner } from "../src/ui/banner.js";
 import { bold, cyan, dim, inverse, magenta } from "../src/ui/color.js";
 import { formatPickerMenu, pickerLabels, pickerSelectChoices } from "../src/ui/picker.js";
-import { PromptCancelled, type PromptIo } from "../src/ui/prompt.js";
+import { PromptBack, PromptCancelled, type PromptIo } from "../src/ui/prompt.js";
 import { selectChoice } from "../src/ui/select.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -698,6 +698,35 @@ describe("interactive setup UI", () => {
     assert.equal(result.status, 1);
     assert.equal(existsSync(join(root, ".tembiter")), false);
   });
+
+  for (const choice of [["adopt"], ["skill", "install"]]) {
+    it(`Escape from ${choice.join(" ")} returns to the picker`, async () => {
+      const selections = [choice, undefined] as const;
+      let selection = 0;
+      const prompt: PromptIo = {
+        write() {},
+        question() {
+          return Promise.reject(new Error("question should not be called"));
+        },
+        input() {
+          return Promise.resolve({ kind: "back" as const });
+        },
+        select<T = string[]>() {
+          const value = selections[selection++];
+          if (value === undefined) {
+            return Promise.reject(new PromptCancelled());
+          }
+          return Promise.resolve([...value] as T);
+        },
+        close() {},
+      };
+
+      const result = await runMain([], { ...ttyStreams(), prompt });
+
+      assert.equal(result.status, 1);
+      assert.equal(selection, 2);
+    });
+  }
 
   it("Escape from init setup returns to the picker without side effects", async () => {
     const root = tempDir();

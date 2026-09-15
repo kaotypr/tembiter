@@ -9,6 +9,13 @@ export class PromptCancelled extends Error {
   }
 }
 
+export class PromptBack extends Error {
+  constructor() {
+    super("Back");
+    this.name = "PromptBack";
+  }
+}
+
 export type { SelectChoice };
 
 export type PromptIo = {
@@ -178,7 +185,13 @@ export async function promptFlag(
   const query = `${options.title}: `;
   while (true) {
     writeFieldCopy(io, options);
-    const answer = (await io.question(query)).trim();
+    const result = io.input === undefined
+      ? { kind: "value" as const, value: await io.question(query) }
+      : await io.input(query);
+    if (result.kind === "back") {
+      throw new PromptBack();
+    }
+    const answer = result.value.trim();
     if (answer.length > 0) {
       return answer;
     }
