@@ -23,7 +23,7 @@ export const PICKER_COMMANDS: readonly PickerChoice[] = [
   {
     key: "3",
     label: "skill install",
-    description: "Install a packaged skill onto a template or project",
+    description: "Install a packaged skill onto a connected project",
     argv: ["skill", "install"],
   },
 ];

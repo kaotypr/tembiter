@@ -175,7 +175,7 @@ export async function promptFlag(
   flag: string,
   options: PromptFlagOptions,
 ): Promise<string | undefined> {
-  const query = `--${flag}: `;
+  const query = `${options.title}: `;
   while (true) {
     writeFieldCopy(io, options);
     const answer = (await io.question(query)).trim();

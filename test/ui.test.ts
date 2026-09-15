@@ -344,7 +344,7 @@ describe("interactive setup UI", () => {
     assert.match(menu, /skill install/);
     assert.match(menu, /Start a new project from a template tag/);
     assert.match(menu, /Connect an existing project to a tagged template/);
-    assert.match(menu, /Install a packaged skill onto a template or project/);
+    assert.match(menu, /Install a packaged skill onto a connected project/);
     assert.doesNotMatch(menu, /update/);
     const choices = pickerSelectChoices();
     assert.deepEqual(
@@ -360,7 +360,7 @@ describe("interactive setup UI", () => {
       [
         "Start a new project from a template tag",
         "Connect an existing project to a tagged template",
-        "Install a packaged skill onto a template or project",
+        "Install a packaged skill onto a connected project",
       ],
     );
   });
@@ -424,10 +424,10 @@ describe("interactive setup UI", () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(prompt.questions, [
-      "--template: ",
-      "--target: ",
-      "--tag: ",
-      "--message: ",
+      "Template repository: ",
+      "New project directory: ",
+      "Template version: ",
+      "First-commit message: ",
     ]);
     const promptWrites = prompt.writes.join("");
     assert.match(promptWrites, /Template repository/);
@@ -525,10 +525,10 @@ describe("interactive setup UI", () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(prompt.questions, [
-      "--template: ",
-      "--tag: ",
-      "--project: ",
-      "--message: ",
+      "Template repository: ",
+      "Template version: ",
+      "Project repository: ",
+      "Commit message: ",
     ]);
     const adoptWrites = prompt.writes.join("");
     assert.match(adoptWrites, /Template repository/);
@@ -592,10 +592,10 @@ describe("interactive setup UI", () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(prompt.questions, [
-      "--template: ",
-      "--tag: ",
-      "--project: ",
-      "--message: ",
+      "Template repository: ",
+      "Template version: ",
+      "Project repository: ",
+      "Commit message: ",
     ]);
     assert.equal(
       gitText(["rev-parse", "HEAD^"], { cwd: project, env: template.env }),
@@ -621,7 +621,7 @@ describe("interactive setup UI", () => {
     });
 
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(prompt.questions, ["--skill: ", "--path: "]);
+    assert.deepEqual(prompt.questions, ["Skill id: ", "Repository root: "]);
     const skillWrites = prompt.writes.join("");
     assert.match(skillWrites, /Skill id/);
     assert.match(
@@ -654,7 +654,7 @@ describe("interactive setup UI", () => {
     });
 
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(prompt.questions, ["--skill: ", "--path: "]);
+    assert.deepEqual(prompt.questions, ["Skill id: ", "Repository root: "]);
     assert.equal(
       existsSync(join(project.repo, ".agents", "skills", "tembiter-sync", "SKILL.md")),
       true,
@@ -760,7 +760,7 @@ describe("interactive setup UI", () => {
     const numbered = writes.join("");
     assert.match(numbered, /1\) init/);
     assert.match(numbered, /Start a new project from a template tag/);
-    assert.match(numbered, /Install a packaged skill onto a template or project/);
+    assert.match(numbered, /Install a packaged skill onto a connected project/);
     assert.doesNotMatch(numbered, /update/);
   });
 
