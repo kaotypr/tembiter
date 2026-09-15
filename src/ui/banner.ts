@@ -10,7 +10,7 @@ import {
 
 export const TITLE = "Tembiter";
 
-export const DESCRIPTION = "Arbiter for template format, setup CLI, and skills.";
+export const DESCRIPTION = "Arbiter for the template and the projects that use it";
 
 const WORDMARK_LINES = [
   "  _____          _    _ _",

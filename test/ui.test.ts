@@ -300,7 +300,7 @@ describe("interactive setup UI", () => {
     assert.match(banner, /template/);
     assert.match(banner, /project/);
     assert.match(banner, /◆/);
-    assert.match(banner, /Arbiter for template format, setup CLI, and skills/);
+    assert.match(banner, /Arbiter for the template and the projects that use it/);
     assert.doesNotMatch(banner, /TEMBITER/);
     for (const line of banner.split("\n")) {
       assert.ok(line.length <= 80, JSON.stringify(line));
