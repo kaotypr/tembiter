@@ -703,8 +703,11 @@ describe("interactive setup UI", () => {
     const root = tempDir();
     const selections = [["init"], undefined] as const;
     let selection = 0;
+    const writes: string[] = [];
     const prompt: PromptIo = {
-      write() {},
+      write(text: string) {
+        writes.push(text);
+      },
       question() {
         return Promise.reject(new Error("question should not be called"));
       },
@@ -727,6 +730,7 @@ describe("interactive setup UI", () => {
     assert.equal(selection, 2);
     assert.equal(existsSync(join(root, ".git")), false);
     assert.equal(existsSync(join(root, ".tembiter")), false);
+    assert.match(writes.join(""), /\x1b\[4F/);
   });
 
   it("--non-interactive no-args prints usage and does not prompt", async () => {

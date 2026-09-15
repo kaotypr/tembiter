@@ -39,14 +39,26 @@ async function readRequired(io: PromptIo, field: SetupField): Promise<PromptInpu
   }
 }
 
+function clearSetupPage(io: PromptIo, renderedLines: number): void {
+  io.write(`\x1b[${renderedLines}F`);
+  for (let line = 0; line < renderedLines; line += 1) {
+    io.write("\x1b[2K\n");
+  }
+}
+
+function backFromSetup(io: PromptIo, renderedFields: number): InitSetupResult {
+  clearSetupPage(io, 2 + renderedFields * 2);
+  return { kind: "back" };
+}
+
 export async function promptInitSetup(io: PromptIo): Promise<InitSetupResult> {
   io.write("Set up a new project (Escape to go back)\n\n");
   const template = await readRequired(io, FIELDS.template);
-  if (template.kind === "back") return template;
+  if (template.kind === "back") return backFromSetup(io, 1);
   const tag = await readRequired(io, FIELDS.tag);
-  if (tag.kind === "back") return tag;
+  if (tag.kind === "back") return backFromSetup(io, 2);
   const target = await readRequired(io, FIELDS.target);
-  if (target.kind === "back") return target;
+  if (target.kind === "back") return backFromSetup(io, 3);
   return {
     kind: "submit",
     template: template.value,
