@@ -13,10 +13,15 @@ export type { SelectChoice };
 
 export type PromptIo = {
   question(query: string): Promise<string>;
+  input?(query: string): Promise<PromptInputResult>;
   select<T = string[]>(choices: readonly SelectChoice<T>[]): Promise<T>;
   write(text: string): void;
   close(): void;
 };
+
+export type PromptInputResult =
+  | { kind: "value"; value: string }
+  | { kind: "back" };
 
 export type TtyLike = {
   isTTY?: boolean;
@@ -66,6 +71,61 @@ export function createReadlinePrompt(
         }
         throw err;
       }
+    },
+    async input(query: string): Promise<PromptInputResult> {
+      const stream = input as NodeJS.ReadStream;
+      if (stream.isTTY !== true || typeof stream.setRawMode !== "function") {
+        const value = await prompt.question(query);
+        return value === "\x1b" ? { kind: "back" } : { kind: "value", value };
+      }
+
+      const previousRaw = Boolean(stream.isRaw);
+      let value = "";
+      output.write(cyan(query, { stream: output }));
+      stream.setRawMode(true);
+      stream.resume();
+      stream.setEncoding("utf8");
+
+      return new Promise<PromptInputResult>((resolve, reject) => {
+        const cleanup = (): void => {
+          stream.off("data", onData);
+          stream.setRawMode(previousRaw);
+        };
+        const finish = (result: PromptInputResult): void => {
+          cleanup();
+          output.write("\n");
+          resolve(result);
+        };
+        const onData = (chunk: string | Buffer): void => {
+          for (const key of String(chunk)) {
+            if (key === "\x03") {
+              cleanup();
+              reject(new PromptCancelled());
+              return;
+            }
+            if (key === "\x1b") {
+              finish({ kind: "back" });
+              return;
+            }
+            if (key === "\r" || key === "\n") {
+              finish({ kind: "value", value });
+              return;
+            }
+            if (key === "\x7f" || key === "\b") {
+              if (value.length > 0) {
+                value = value.slice(0, -1);
+                output.write("\b \b");
+              }
+              continue;
+            }
+            if (key >= " ") {
+              value += key;
+              output.write(key);
+            }
+          }
+        };
+        stream.on("data", onData);
+      });
     },
     async select<T = string[]>(choices: readonly SelectChoice<T>[]): Promise<T> {
       if (closed) {

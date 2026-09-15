@@ -188,29 +188,6 @@ describe("packaged tembiter-sync skill", () => {
   });
 });
 
-describe("packaged tembiter-setup skill", () => {
-  it("tells a template owner to keep format, tag versions, and not invent a scheme", () => {
-    const body = packagedSkillBody("tembiter-setup");
-    assertIncludes(body, 'Keep template-side `.tembiter/config.json` with `kind: "template"`');
-    assertIncludes(body, ".tembiter/sync/");
-    assertIncludes(body, "gitignored");
-    assertIncludes(body, "Create git tags for versions");
-    assertIncludes(body, "create a git tag on that old commit so adopt fallback can bind");
-    assertIncludes(body, "never invent a tembiter-only version scheme");
-    assertIncludes(body, "Do not tell anyone to run `npx tembiter` as the bump workflow");
-    assertIncludes(body, "Do not run `tembiter-sync` here");
-    assert.doesNotMatch(body, /npx tembiter update/);
-    assert.doesNotMatch(body, /tembiter-apply-template-update/);
-    assert.doesNotMatch(body, /tembiter-prepare-template/);
-  });
-
-  it("YAML name equals the directory id", () => {
-    const body = packagedSkillBody("tembiter-setup");
-    assert.equal(yamlName(body), "tembiter-setup");
-    assert.match(body, /^# Prepare template$/m);
-  });
-});
-
 describe("tembiter help has no update command", () => {
   it("--help does not advertise an update command", () => {
     const result = runCli(["--help"]);
@@ -276,23 +253,6 @@ describe("skill install still expands the S4 bodies", () => {
     assertIncludes(refreshed, "Do not tell the human to run `npx tembiter` for this bump");
   });
 
-  it("installs tembiter-setup into a temp template", () => {
-    const root = tempDir();
-    const template = createRepo(root, "template", "template");
-
-    const result = runCli(
-      ["skill", "install", "--skill", "tembiter-setup", "--path", template.repo],
-      template.env,
-    );
-
-    assert.equal(result.status, 0, result.stderr);
-    const installed = readFileSync(
-      join(template.repo, ".agents", "skills", "tembiter-setup", "SKILL.md"),
-      "utf8",
-    );
-    assert.equal(installed, packagedSkillBody("tembiter-setup"));
-    assertIncludes(installed, "never invent a tembiter-only version scheme");
-  });
 });
 
 describe("README documents agent updates, not a human update command", () => {
@@ -301,7 +261,7 @@ describe("README documents agent updates, not a human update command", () => {
     assert.match(readme, /later bumps are an \*\*AI agent\*\* workflow/i);
     assert.match(readme, /tembiter skill install/);
     assert.match(readme, /tembiter-sync/);
-    assert.match(readme, /tembiter-setup/);
+    assert.doesNotMatch(readme, /tembiter-setup/);
     assert.match(readme, /\.tembiter\/sync\/<tag>/);
     assert.match(readme, /tembiter\/sync-<tag>/);
     assert.match(readme, /default\/base branch/);
