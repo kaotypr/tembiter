@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { SelectChoice } from "../ui/prompt.js";
 
 export type SkillPurpose = "project" | "template";
 
@@ -19,6 +20,14 @@ export function getCatalogEntry(id: string): CatalogEntry | undefined {
 
 export function knownSkillSummary(): string {
   return CATALOG.map((entry) => `${entry.id} (${entry.purpose})`).join(", ");
+}
+
+export function skillSelectChoices(): SelectChoice<string>[] {
+  return CATALOG.map((entry) => ({
+    label: entry.id,
+    description: `${entry.purpose} skill for applying later template updates`,
+    value: entry.id,
+  }));
 }
 
 export function packageRoot(): string {

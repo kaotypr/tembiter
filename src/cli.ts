@@ -21,7 +21,7 @@ import {
   runSkillInstall,
   type SkillInstallFlags,
 } from "./commands/skill-install.js";
-import { knownSkillSummary } from "./skills/catalog.js";
+import { skillSelectChoices } from "./skills/catalog.js";
 import { printBanner } from "./ui/banner.js";
 import { promptInitSetup } from "./ui/init-setup.js";
 import { pickSetupCommand } from "./ui/picker.js";
@@ -120,11 +120,6 @@ const ADOPT_FIELDS = {
 } as const satisfies Record<string, PromptFlagOptions>;
 
 const SKILL_INSTALL_FIELDS = {
-  skill: {
-    title: "Skill id",
-    description: `Catalog id (${knownSkillSummary()})`,
-    required: true,
-  },
   path: {
     title: "Repository root",
     description: "Connected project repository root",
@@ -248,7 +243,9 @@ async function fillAdopt(flags: AdoptFlags, io: PromptIo): Promise<void> {
 
 async function fillSkillInstall(flags: SkillInstallFlags, io: PromptIo): Promise<void> {
   if (flags.skill === undefined || flags.skill.length === 0) {
-    flags.skill = await promptFlag(io, "skill", SKILL_INSTALL_FIELDS.skill);
+    flags.skill = await io.select(skillSelectChoices(), {
+      title: "Select a skill to install:",
+    });
   }
   if (flags.path === undefined || flags.path.length === 0) {
     flags.path = await promptFlag(io, "path", SKILL_INSTALL_FIELDS.path);
