@@ -9,7 +9,6 @@ const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const requiredPaths = [
   "dist/src/cli.js",
   "skills/tembiter-sync/SKILL.md",
-  "skills/tembiter-setup/SKILL.md",
   "README.md",
   "LICENSE",
   "package.json",
@@ -46,7 +45,7 @@ function packFilePaths(stdout: string): string[] {
 
 describe("npm pack contents", () => {
   it("includes the CLI, skills, README, LICENSE, and package.json", () => {
-    const result = spawnSync("npm", ["pack", "--dry-run", "--json"], {
+    const result = spawnSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
       cwd: packageRoot,
       encoding: "utf8",
       env: process.env,
@@ -57,6 +56,7 @@ describe("npm pack contents", () => {
     for (const required of requiredPaths) {
       assert.ok(paths.includes(required), `missing ${required} in ${JSON.stringify(paths)}`);
     }
+    assert.equal(paths.includes("skills/tembiter-setup/SKILL.md"), false);
     assert.equal(paths.includes("skills/apply-template-update/SKILL.md"), false);
     assert.equal(paths.includes("skills/prepare-template/SKILL.md"), false);
     assert.equal(paths.includes("skills/tembiter-apply-template-update/SKILL.md"), false);

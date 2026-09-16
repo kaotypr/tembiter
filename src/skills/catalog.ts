@@ -11,7 +11,6 @@ export type CatalogEntry = {
 
 export const CATALOG: readonly CatalogEntry[] = [
   { id: "tembiter-sync", purpose: "project" },
-  { id: "tembiter-setup", purpose: "template" },
 ];
 
 export function getCatalogEntry(id: string): CatalogEntry | undefined {

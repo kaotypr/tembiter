@@ -38,13 +38,13 @@ describe("tembiter CLI", () => {
     assert.ok(result.stdout.length > 0);
   });
 
-  it("--help exits 0 and lists the four setup commands", () => {
+  it("--help exits 0 and lists the three setup commands", () => {
     const result = runCli(["--help"]);
     assert.equal(result.status, 0);
     assert.match(result.stdout, /tembiter/);
     assert.ok(result.stdout.includes(packageJson.version));
     assert.match(result.stdout, /init/);
-    assert.match(result.stdout, /template register/);
+    assert.doesNotMatch(result.stdout, /template register/);
     assert.match(result.stdout, /adopt/);
     assert.match(result.stdout, /skill install/);
     assert.doesNotMatch(result.stdout, /Setup commands are not implemented/);
@@ -56,13 +56,6 @@ describe("tembiter CLI", () => {
     assert.match(result.stdout, /--template/);
     assert.match(result.stdout, /--target/);
     assert.match(result.stdout, /--tag/);
-    assert.match(result.stdout, /--message/);
-  });
-
-  it("template register --help names --path and --message", () => {
-    const result = runCli(["template", "register", "--help"]);
-    assert.equal(result.status, 0);
-    assert.match(result.stdout, /--path/);
     assert.match(result.stdout, /--message/);
   });
 
