@@ -13,6 +13,16 @@ function lineIgnoresSyncWorktree(line: string): boolean {
   return trimmed === ".tembiter/sync" || trimmed === ".tembiter/sync/";
 }
 
+export function needsSyncGitignore(repoRoot: string): boolean {
+  const path = gitignorePath(repoRoot);
+  if (!existsSync(path)) {
+    return true;
+  }
+  return !readFileSync(path, "utf8")
+    .split(/\r?\n/)
+    .some(lineIgnoresSyncWorktree);
+}
+
 export function ensureSyncGitignore(repoRoot: string): boolean {
   const path = gitignorePath(repoRoot);
   if (!existsSync(path)) {
