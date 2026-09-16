@@ -20,6 +20,7 @@ export type { SelectChoice };
 
 export type PromptIo = {
   question(query: string): Promise<string>;
+  confirm?(message: string): Promise<boolean>;
   input?(query: string): Promise<PromptInputResult>;
   select<T = string[]>(choices: readonly SelectChoice<T>[]): Promise<T>;
   write(text: string): void;
@@ -78,6 +79,10 @@ export function createReadlinePrompt(
         }
         throw err;
       }
+    },
+    async confirm(message: string): Promise<boolean> {
+      const answer = (await prompt.question(`${message} [y/N] `)).trim().toLowerCase();
+      return answer === "y" || answer === "yes";
     },
     async input(query: string): Promise<PromptInputResult> {
       const stream = input as NodeJS.ReadStream;

@@ -10,7 +10,7 @@ import {
   writeConfig,
   type TembiterConfig,
 } from "../format/config.js";
-import { ensureSyncGitignore, GITIGNORE_FILE } from "../format/gitignore.js";
+import { ensureSyncGitignore, GITIGNORE_FILE, needsSyncGitignore } from "../format/gitignore.js";
 import { GitError, gitConfigGet, gitText, isGitUrl, runGit } from "../git.js";
 import { createProgressReporter, type ProgressReporter } from "../ui/progress.js";
 import { CliError } from "./init.js";
@@ -514,8 +514,12 @@ export function adoptFromFlags(
 
   if (tembiterIsDirty(projectRoot, env)) {
     const message = flags.message ?? defaultAdoptMessage(template, resolvedTag);
+    const gitignoreChanged = needsSyncGitignore(projectRoot);
+    if (gitignoreChanged) {
+      progress.step("Updating .gitignore…");
+    }
     progress.step("Creating commit…");
-    const gitignoreChanged = ensureSyncGitignore(projectRoot);
+    ensureSyncGitignore(projectRoot);
     commitTembiter(projectRoot, message, env, gitignoreChanged);
   }
   progress.done(`Connected ${projectRoot} to ${template}@${resolvedTag}.`);
