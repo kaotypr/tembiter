@@ -1,5 +1,5 @@
 import { dim, inverse, type TtyStream } from "./color.js";
-import { PromptBack, PromptCancelled } from "./prompt.js";
+import { PromptBack, PromptCancelled } from "./errors.js";
 
 export type SelectChoice<T = string[]> = {
   key?: string;
@@ -155,6 +155,7 @@ async function selectRaw<T>(
 ): Promise<T> {
   let index = 0;
   let buffer = "";
+  let escapeTimer: ReturnType<typeof setTimeout> | undefined;
   const previousRaw = Boolean(stdin.isRaw);
 
   stdin.setRawMode(true);
@@ -168,6 +169,20 @@ async function selectRaw<T>(
     return await new Promise<T>((resolve, reject) => {
       const onData = (chunk: string | Buffer): void => {
         buffer += String(chunk);
+        if (buffer === "\x1b") {
+          escapeTimer = setTimeout(() => {
+            escapeTimer = undefined;
+            buffer = "";
+            cleanup();
+            clearList(stdout, lines);
+            reject(new PromptBack());
+          }, 50);
+          return;
+        }
+        if (escapeTimer !== undefined) {
+          clearTimeout(escapeTimer);
+          escapeTimer = undefined;
+        }
         while (true) {
           const parsed = consumeKey(buffer);
           if (parsed === undefined) {
@@ -224,6 +239,10 @@ async function selectRaw<T>(
 
       const cleanup = (): void => {
         stdin.off("data", onData);
+        if (escapeTimer !== undefined) {
+          clearTimeout(escapeTimer);
+          escapeTimer = undefined;
+        }
         if (typeof stdin.setRawMode === "function") {
           stdin.setRawMode(previousRaw);
         }
