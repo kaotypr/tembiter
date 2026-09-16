@@ -18,6 +18,7 @@ import { gitText, runGit } from "../src/git.js";
 import { TITLE, formatBanner, printBanner } from "../src/ui/banner.js";
 import { bold, cyan, dim, inverse, magenta } from "../src/ui/color.js";
 import { formatPickerMenu, pickerLabels, pickerSelectChoices } from "../src/ui/picker.js";
+import { skillSelectChoices } from "../src/skills/catalog.js";
 import { PromptBack, PromptCancelled, type PromptIo } from "../src/ui/prompt.js";
 import { selectChoice } from "../src/ui/select.js";
 
@@ -124,13 +125,17 @@ function createSkillRepo(
 function scriptedPrompt(
   answers: string[],
   selectValue?: string[],
-): PromptIo & { questions: string[]; writes: string[] } {
+  selectQueue: string[][] = [],
+): PromptIo & { questions: string[]; writes: string[]; selections: string[][] } {
   const remaining = [...answers];
+  const selectionQueue = [...selectQueue, ...(selectValue === undefined ? [] : [selectValue])];
   const questions: string[] = [];
   const writes: string[] = [];
+  const selections: string[][] = [];
   return {
     questions,
     writes,
+    selections,
     write(text: string) {
       writes.push(text);
     },
@@ -142,11 +147,13 @@ function scriptedPrompt(
       }
       return Promise.resolve(next);
     },
-    select<T = string[]>() {
-      if (selectValue === undefined) {
+    select<T = string[]>(choices: readonly { label: string; value: T }[]) {
+      selections.push(choices.map((choice) => choice.label));
+      const next = selectionQueue.shift();
+      if (next === undefined) {
         return Promise.reject(new Error("select should not be called"));
       }
-      return Promise.resolve(selectValue as T);
+      return Promise.resolve(next as T);
     },
     close() {},
   };
@@ -363,6 +370,16 @@ describe("interactive setup UI", () => {
         "Install a packaged skill onto a connected project",
       ],
     );
+  });
+
+  it("skill catalog choices expose IDs and purposes", () => {
+    assert.deepEqual(skillSelectChoices(), [
+      {
+        label: "tembiter-sync",
+        description: "project skill for applying later template updates",
+        value: "tembiter-sync",
+      },
+    ]);
   });
 
   it("fake picker answers for init produce the same git and format effects as flags", async () => {
@@ -612,7 +629,7 @@ describe("interactive setup UI", () => {
   it("fake prompt answers for skill install match the flags path", async () => {
     const root = tempDir();
     const project = createSkillRepo(root, "project", "project");
-    const prompt = scriptedPrompt(["tembiter-sync", project.repo]);
+    const prompt = scriptedPrompt([project.repo], undefined, [["tembiter-sync"]]);
 
     const result = await runMain(["skill", "install"], {
       ...ttyStreams(),
@@ -621,15 +638,11 @@ describe("interactive setup UI", () => {
     });
 
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(prompt.questions, ["Skill id: ", "Repository root: "]);
+    assert.deepEqual(prompt.questions, ["Repository root: "]);
     const skillWrites = prompt.writes.join("");
-    assert.match(skillWrites, /Skill id/);
-    assert.match(
-      skillWrites,
-      /Catalog id \(tembiter-sync \(project\)\)/,
-    );
     assert.match(skillWrites, /Repository root/);
     assert.match(skillWrites, /Connected project repository root/);
+    assert.deepEqual(prompt.selections, [["tembiter-sync"]]);
     assert.match(result.stdout, /Done\. Installed tembiter-sync at /);
     const installed = join(
       project.repo,
@@ -645,7 +658,11 @@ describe("interactive setup UI", () => {
   it("fake picker select for skill install produces the same install as flags", async () => {
     const root = tempDir();
     const project = createSkillRepo(root, "picker-project", "project");
-    const prompt = scriptedPrompt(["tembiter-sync", project.repo], ["skill", "install"]);
+    const prompt = scriptedPrompt(
+      [project.repo],
+      undefined,
+      [["skill", "install"], ["tembiter-sync"]],
+    );
 
     const result = await runMain([], {
       ...ttyStreams(),
@@ -654,7 +671,11 @@ describe("interactive setup UI", () => {
     });
 
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(prompt.questions, ["Skill id: ", "Repository root: "]);
+    assert.deepEqual(prompt.questions, ["Repository root: "]);
+    assert.deepEqual(prompt.selections, [
+      ["init", "adopt", "skill install"],
+      ["tembiter-sync"],
+    ]);
     assert.equal(
       existsSync(join(project.repo, ".agents", "skills", "tembiter-sync", "SKILL.md")),
       true,
@@ -714,9 +735,13 @@ describe("interactive setup UI", () => {
         input() {
           return Promise.resolve({ kind: "back" as const });
         },
-        select<T = string[]>() {
+        select<T = string[]>(choices: readonly { label: string; value: T }[]) {
           const value = selections[selection++];
           if (value === undefined) {
+            if (selection === 2) {
+              writes.push("\x1b[3F");
+              return Promise.reject(new PromptBack());
+            }
             return Promise.reject(new PromptCancelled());
           }
           return Promise.resolve([...value] as T);
@@ -727,7 +752,7 @@ describe("interactive setup UI", () => {
       const result = await runMain([], { ...ttyStreams(), prompt });
 
       assert.equal(result.status, 1);
-      assert.equal(selection, 2);
+      assert.equal(selection, choice[0] === "skill" ? 3 : 2);
       assert.match(writes.join(""), /\x1b\[3F/);
     });
   }

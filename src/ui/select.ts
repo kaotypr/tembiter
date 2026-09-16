@@ -1,5 +1,5 @@
 import { dim, inverse, type TtyStream } from "./color.js";
-import { PromptCancelled } from "./prompt.js";
+import { PromptBack, PromptCancelled } from "./prompt.js";
 
 export type SelectChoice<T = string[]> = {
   key?: string;
@@ -12,6 +12,7 @@ export type SelectOptions = {
   stdin: NodeJS.ReadableStream;
   stdout: NodeJS.WritableStream & TtyStream;
   question?: (query: string) => Promise<string>;
+  title?: string;
 };
 
 const UP = new Set(["\x1b[A", "\x1bOA"]);
@@ -42,9 +43,10 @@ function listLines(
   choices: readonly SelectChoice<unknown>[],
   index: number,
   stdout: TtyStream,
+  title: string,
 ): string[] {
   return [
-    "Select a setup command:",
+    title,
     "",
     ...choices.flatMap((choice, i) => formatChoiceRows(choice, i === index, stdout)),
   ];
@@ -111,8 +113,9 @@ async function selectNumbered<T>(
   choices: readonly SelectChoice<T>[],
   stdout: NodeJS.WritableStream & TtyStream,
   question: (query: string) => Promise<string>,
+  title: string,
 ): Promise<T> {
-  const lines = ["Select a setup command:", ""];
+  const lines = [title, ""];
   for (const [i, choice] of choices.entries()) {
     const key = choice.key ?? String(i + 1);
     lines.push(`  ${key}) ${choice.label}`);
@@ -126,6 +129,9 @@ async function selectNumbered<T>(
   const answer = (await question("Command: ")).trim();
   if (answer.length === 0) {
     throw new PromptCancelled();
+  }
+  if (answer === "\x1b") {
+    throw new PromptBack();
   }
 
   const match = choices.find(
@@ -145,6 +151,7 @@ async function selectRaw<T>(
   choices: readonly SelectChoice<T>[],
   stdin: NodeJS.ReadStream,
   stdout: NodeJS.WritableStream & TtyStream,
+  title: string,
 ): Promise<T> {
   let index = 0;
   let buffer = "";
@@ -154,7 +161,7 @@ async function selectRaw<T>(
   stdin.resume();
   stdin.setEncoding("utf8");
 
-  const lines = listLines(choices, index, stdout);
+  const lines = listLines(choices, index, stdout, title);
   writeList(stdout, lines, false);
 
   try {
@@ -173,6 +180,12 @@ async function selectRaw<T>(
             cleanup();
             clearList(stdout, lines);
             reject(new PromptCancelled());
+            return;
+          }
+          if (key === "\x1b") {
+            cleanup();
+            clearList(stdout, lines);
+            reject(new PromptBack());
             return;
           }
           if (ENTER.has(key)) {
@@ -199,12 +212,12 @@ async function selectRaw<T>(
 
           if (UP.has(key) || key === "k") {
             index = (index - 1 + choices.length) % choices.length;
-            writeList(stdout, listLines(choices, index, stdout), true);
+            writeList(stdout, listLines(choices, index, stdout, title), true);
             continue;
           }
           if (DOWN.has(key) || key === "j") {
             index = (index + 1) % choices.length;
-            writeList(stdout, listLines(choices, index, stdout), true);
+            writeList(stdout, listLines(choices, index, stdout, title), true);
           }
         }
       };
@@ -233,11 +246,12 @@ export async function selectChoice<T>(
   if (choices.length === 0) {
     throw new PromptCancelled("select requires at least one choice");
   }
+  const title = options.title ?? "Select a setup command:";
   if (canUseRawMode(options.stdin)) {
-    return selectRaw(choices, options.stdin, options.stdout);
+    return selectRaw(choices, options.stdin, options.stdout, title);
   }
   if (options.question !== undefined) {
-    return selectNumbered(choices, options.stdout, options.question);
+    return selectNumbered(choices, options.stdout, options.question, title);
   }
   throw new PromptCancelled("Interactive select requires a TTY");
 }
