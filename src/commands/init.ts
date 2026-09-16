@@ -213,6 +213,13 @@ function extractTagTree(repoPath: string, tag: string, target: string): void {
   rmSync(join(target, CONFIG_DIR), { recursive: true, force: true });
 }
 
+function tagExists(repoPath: string, tag: string): boolean {
+  return runGit(["rev-parse", "--verify", "--quiet", `refs/tags/${tag}`], {
+    cwd: repoPath,
+    allowFailure: true,
+  }).status === 0;
+}
+
 function withTemplateRepo(
   template: string,
   env: NodeJS.ProcessEnv,
@@ -287,9 +294,12 @@ export function initFromFlags(
   const target = resolve(targetArg);
 
   assertTargetUsable(target);
-  mkdirSync(target, { recursive: true });
 
   withTemplateRepo(template, env, progress, (repoPath) => {
+    if (!tagExists(repoPath, tag)) {
+      throw new CliError(`Tag '${tag}' was not found in the template. Pass an existing --tag.`);
+    }
+    mkdirSync(target, { recursive: true });
     progress.step(`Copying tag ${tag} into ${target}…`);
     try {
       extractTagTree(repoPath, tag, target);
@@ -305,7 +315,9 @@ export function initFromFlags(
 
   progress.step("Writing .tembiter/…");
   writeConfig(target, projectConfig(template, tag));
-  ensureSyncGitignore(target);
+  if (ensureSyncGitignore(target)) {
+    progress.step("Updating .gitignore…");
+  }
   progress.step("Creating initial commit…");
   initRepository(target, message, env);
   progress.done(`Created project at ${target} from ${template}@${tag}.`);

@@ -238,7 +238,9 @@ export function installSkillFromFlags(
   const target = resolveTargetDir(flags.path as string);
   assertGitRepository(target);
   assertPurposeMatches(target, entry);
-  ensureSyncGitignore(target);
+  if (ensureSyncGitignore(target)) {
+    progress.step("Updating .gitignore…");
+  }
   progress.step(`Installing ${entry.id} into ${target}…`);
   copySkill(entry, target);
   if (existsSync(join(target, CLAUDE_DIR))) {
