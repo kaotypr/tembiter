@@ -30,6 +30,7 @@ import {
   type ProgressReporter,
 } from "./ui/progress.js";
 import {
+  clearPromptHeading,
   createReadlinePrompt,
   detectInteractive,
   PromptBack,
@@ -303,10 +304,19 @@ async function handleAdopt(commandArgs: string[], ctx: CommandContext): Promise<
     return run(commandArgs);
   }
   if (ctx.fromPicker || missingAdopt(flags).length > 0) {
+    let headingWritten = false;
     if (ctx.fromPicker) {
       ctx.ensurePrompt().write("Adopt an existing project\n\n");
+      headingWritten = true;
     }
-    await fillAdopt(flags, ctx.ensurePrompt());
+    try {
+      await fillAdopt(flags, ctx.ensurePrompt());
+    } catch (err) {
+      if (headingWritten && err instanceof PromptBack) {
+        clearPromptHeading(ctx.ensurePrompt());
+      }
+      throw err;
+    }
     afterFill(ctx);
     await confirmIfAvailable(
       ctx,
@@ -340,7 +350,14 @@ async function handleSkillInstall(commandArgs: string[], ctx: CommandContext): P
   }
   if (ctx.fromPicker || missingSkillInstall(flags).length > 0) {
     ctx.ensurePrompt().write("Install a packaged skill into a connected project\n\n");
-    await fillSkillInstall(flags, ctx.ensurePrompt());
+    try {
+      await fillSkillInstall(flags, ctx.ensurePrompt());
+    } catch (err) {
+      if (err instanceof PromptBack) {
+        clearPromptHeading(ctx.ensurePrompt());
+      }
+      throw err;
+    }
     afterFill(ctx);
     return run(flagArgs(flags));
   }

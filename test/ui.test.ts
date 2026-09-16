@@ -754,6 +754,7 @@ describe("interactive setup UI", () => {
       assert.equal(result.status, 1);
       assert.equal(selection, choice[0] === "skill" ? 3 : 2);
       assert.match(writes.join(""), /\x1b\[3F/);
+      assert.match(writes.join(""), /\x1b\[2F/);
     });
   }
 
