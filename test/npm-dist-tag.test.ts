@@ -35,8 +35,8 @@ describe("resolveNpmDistTag", () => {
     assert.equal(resolveNpmDistTag("v1.0.0-beta.1", "1.0.0-beta.1"), "beta");
   });
 
-  it("maps v0.2.2 to latest", () => {
-    assert.equal(resolveNpmDistTag("v0.2.2", "0.2.2"), "latest");
+  it("maps v0.2.3 to latest", () => {
+    assert.equal(resolveNpmDistTag("v0.2.3", "0.2.3"), "latest");
   });
 
   it("fails when git tag and package version mismatch", () => {
@@ -54,7 +54,7 @@ describe("resolveNpmDistTag", () => {
 
 describe("npm-dist-tag CLI", () => {
   it("prints only the dist-tag for the matching package version", () => {
-    const result = runHelper({ ...process.env, GITHUB_REF_NAME: "v0.2.2" });
+    const result = runHelper({ ...process.env, GITHUB_REF_NAME: "v0.2.3" });
     assert.equal(result.status, 0);
     assert.equal(result.stdout, "latest\n");
   });
