@@ -186,6 +186,15 @@ function clearFieldCopy(io: PromptIo): void {
   io.write(`\x1b[${renderedLines}F`);
 }
 
+export function clearPromptHeading(io: PromptIo): void {
+  const renderedLines = 2;
+  io.write(`\x1b[${renderedLines}F`);
+  for (let line = 0; line < renderedLines; line += 1) {
+    io.write("\x1b[2K\n");
+  }
+  io.write(`\x1b[${renderedLines}F`);
+}
+
 export async function promptFlag(
   io: PromptIo,
   flag: string,
