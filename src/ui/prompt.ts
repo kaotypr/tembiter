@@ -1,21 +1,9 @@
 import { createInterface } from "node:readline/promises";
 import { cyan, dim, type TtyStream } from "./color.js";
+import { PromptBack, PromptCancelled } from "./errors.js";
 import { selectChoice, type SelectChoice } from "./select.js";
 
-export class PromptCancelled extends Error {
-  constructor(message = "Cancelled") {
-    super(message);
-    this.name = "PromptCancelled";
-  }
-}
-
-export class PromptBack extends Error {
-  constructor() {
-    super("Back");
-    this.name = "PromptBack";
-  }
-}
-
+export { PromptBack, PromptCancelled } from "./errors.js";
 export type { SelectChoice };
 
 export type PromptIo = {
