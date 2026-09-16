@@ -22,7 +22,10 @@ export type PromptIo = {
   question(query: string): Promise<string>;
   confirm?(message: string): Promise<boolean>;
   input?(query: string): Promise<PromptInputResult>;
-  select<T = string[]>(choices: readonly SelectChoice<T>[]): Promise<T>;
+  select<T = string[]>(
+    choices: readonly SelectChoice<T>[],
+    options?: { title?: string },
+  ): Promise<T>;
   write(text: string): void;
   close(): void;
 };
@@ -139,7 +142,10 @@ export function createReadlinePrompt(
         stream.on("data", onData);
       });
     },
-    async select<T = string[]>(choices: readonly SelectChoice<T>[]): Promise<T> {
+    async select<T = string[]>(
+      choices: readonly SelectChoice<T>[],
+      options: { title?: string } = {},
+    ): Promise<T> {
       if (closed) {
         throw new PromptCancelled();
       }
@@ -147,6 +153,7 @@ export function createReadlinePrompt(
         stdin: input,
         stdout: output,
         question: (query) => prompt.question(query),
+        title: options.title,
       });
     },
     close() {
